@@ -95,14 +95,10 @@ Run these checks before previewing or broadcasting any state-changing transactio
 
 ### Stream Creation Fee (`MSG_VALUE`)
 
-For stream creation transactions, include a creation fee of approximately **$1 USD** worth of the chain's native token per stream.
+For stream creation transactions, hard-code `MSG_VALUE` to `500000000000000` wei (`0.0005 ETH`, approximately **$1 USD**).
 
-| Mode | `MSG_VALUE` |
-| --- | --- |
-| Single Stream | one-stream fee |
-| Batch of Streams | `perStreamFee * numberOfStreams` |
-
-- Convert the USD-denominated fee into native token units before building or broadcasting the transaction by browsing the web for the latest native token price.
+- Use the same flat fee for both **Single Stream** and **Batch of Streams** transactions.
+- Do not browse the web or look up ETH/native-token prices.
 - Before sending, verify the wallet has enough native token for both `MSG_VALUE` and gas.
 
 ### Allowance and Token Balance
@@ -153,13 +149,13 @@ fi
 
 #### 2) Run Preflight Checks
 
-Run all checks from [Preflight Checks](#preflight-checks), compute the stream creation `MSG_VALUE` (single or batch), and run the native gas token check before each broadcast (`approve` and stream creation).
+Run all checks from [Preflight Checks](#preflight-checks), set `MSG_VALUE="500000000000000"`, and run the native gas token check before each broadcast (`approve` and stream creation).
 
 ### Single Stream
 
 #### 3) Build Preview Tx (No Broadcast)
 
-For `SablierLockup` stream creation (`create*`), pass the computed creation-fee amount in `MSG_VALUE`.
+For `SablierLockup` stream creation (`create*`), pass the fixed creation fee in `MSG_VALUE`.
 
 ```bash
 RAW_TX=$(cast mktx "$LOCKUP" "$FUNCTION_SIG" $FUNCTION_ARGS \
@@ -231,7 +227,7 @@ RAW_TX=$(cast mktx "$LOCKUP" "batch(bytes[])" "[$CALL_1,$CALL_2,$CALL_3]" \
 echo "Preview raw tx: $RAW_TX"
 ```
 
-Where `MSG_VALUE = perStreamFee * numberOfStreams`.
+Where `MSG_VALUE = 500000000000000` wei (`0.0005 ETH`) for the entire batch.
 
 #### 5) Require Explicit Confirmation
 
@@ -391,6 +387,7 @@ A single cliff stream of 1000 USDC (6 decimals) with a 90-day cliff and 365-day 
 ```bash
 LOCKUP="<lockup-address>"    # From Supported Chains table
 TOKEN="0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"  # USDC on Ethereum
+MSG_VALUE="500000000000000"  # 0.0005 ETH flat fee
 SENDER=$(cast wallet address --private-key "$PRIVATE_KEY")
 RECIPIENT="0x..."
 
@@ -410,7 +407,7 @@ Notes:
 - `cliff` selects the Cliff shape
 - `(0,0)` = no start unlock and no lump-sum cliff unlock amount
 - `(7776000,31536000)` = 90-day cliff and 365-day total duration, both in seconds
-- Replace `$MSG_VALUE` with the computed creation fee
+- `MSG_VALUE` = `500000000000000` wei (`0.0005 ETH`)
 
 ### Batch of Streams: 3x `createWithDurationsLL`
 
@@ -419,6 +416,7 @@ A batch of three linear streams of 1000 USDC each to different recipients, with 
 ```bash
 LOCKUP="<lockup-address>"    # From Supported Chains table
 TOKEN="0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"  # USDC on Ethereum
+MSG_VALUE="500000000000000"  # 0.0005 ETH flat fee for the entire batch
 SENDER=$(cast wallet address --private-key "$PRIVATE_KEY")
 FUNCTION_SIG="createWithDurationsLL((address,address,uint128,address,bool,bool,string),(uint128,uint128),(uint40,uint40))"
 
@@ -430,7 +428,7 @@ CALL_2=$(cast calldata "$FUNCTION_SIG" \
 CALL_3=$(cast calldata "$FUNCTION_SIG" \
   "($SENDER,0xRecipient3,1000000000,$TOKEN,true,true,linear)" "(0,0)" "(0,31536000)")
 
-# MSG_VALUE = perStreamFee * 3
+# MSG_VALUE = 500000000000000 (0.0005 ETH flat fee for the entire batch)
 cast send "$LOCKUP" "batch(bytes[])" "[$CALL_1,$CALL_2,$CALL_3]" \
   --value "$MSG_VALUE" \
   --rpc-url "$RPC_URL" \
@@ -441,7 +439,7 @@ Notes:
 
 - ERC-20 approval must cover the total deposit: 3 × 1000000000 = 3000000000 (3000 USDC)
 - `linear` selects the Linear shape
-- `MSG_VALUE` = 3× the per-stream creation fee
+- `MSG_VALUE` = `500000000000000` wei (`0.0005 ETH`) for the entire batch
 - All three streams use the same `SablierLockup` contract and the same `batch()` entrypoint
 - For more than 50 streams, use [Sablier Airdrops](https://app.sablier.com/airdrops) instead
 

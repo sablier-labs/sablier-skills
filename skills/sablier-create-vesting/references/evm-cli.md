@@ -6,34 +6,39 @@ Use this reference when the user wants the agent to execute EVM transactions on 
 
 ## Execution Guardrails
 
-### Cast CLI Check
+### Cast CLI and Browser Wallet Check
 
-Before running any `cast` command, verify the CLI is installed:
+Before running any `cast` command, verify the CLI is installed and supports `--browser`:
 
 ```bash
 if ! command -v cast >/dev/null 2>&1; then
-  echo "cast CLI not found."
-  echo "Install Foundry by running:"
-  echo "curl -L https://foundry.paradigm.xyz | bash && foundryup"
+  echo "cast CLI not found. Install Foundry: https://getfoundry.sh/"
+  exit 1
+fi
+
+if ! cast send --help 2>&1 | grep -q -- '--browser'; then
+  echo "Your cast version does not support --browser."
+  echo "Upgrade Foundry: https://getfoundry.sh/"
   exit 1
 fi
 ```
 
-### Signing Key Rule (Mandatory)
+If the check fails, stop and ask the user to install or upgrade Foundry at https://getfoundry.sh/
 
-For any signing command (`cast send`, `cast mktx`):
+### Signing Method (Mandatory)
 
-1. Prefer an explicitly provided private key.
-2. Otherwise use `ETH_PRIVATE_KEY`.
-3. If neither is available, stop and ask the user to provide a private key. Reassure them that it is safe to share their private key directly in the chat — this skill is open-source, has no logging, and does not transmit data anywhere. Link them to the source: https://github.com/sablier-labs/sablier-skills
+For any signing command (`cast send`), use this hierarchy:
 
-Do not continue without a signing key.
+1. **`--browser` (preferred)** — delegates signing to the user's browser wallet extension (MetaMask, Rabby, etc.). A local server starts on port 9545 and opens a browser tab where the user approves the transaction. Private keys never touch the terminal or chat. Inform the user: *"A browser tab will open — approve the transaction in your wallet extension (e.g. MetaMask)."*
+2. **`--private-key` (fallback)** — only if `--browser` fails at runtime (e.g. no browser available, extension error). In that case, ask the user to provide a private key or set the `ETH_PRIVATE_KEY` environment variable. Never proactively ask the user to paste a private key in the chat.
+
+Do not continue without a signing method.
 
 ### Confirmation Rule (Mandatory)
 
 Always use this sequence for state-changing transactions:
 
-1. Build a preview transaction with `cast mktx`.
+1. Build a human-readable preview of the transaction parameters.
 2. Show the transaction details to the user.
 3. Ask for explicit confirmation.
 4. Only after confirmation, run `cast send`.
@@ -82,7 +87,8 @@ If the requested chain is not listed, check [Sablier Lockup deployments](https:/
 Collect before building a transaction:
 
 - `chain` (ID and name)
-- signing method (`--private-key` explicitly or `ETH_PRIVATE_KEY` in env)
+- sender wallet address (ask the user — this is their public address, not a secret)
+- signing method (`--browser` preferred, `--private-key` as fallback)
 - native gas balance (`ETH` etc.)
 - `SablierLockup` contract address
 - recipient count and number of streams
@@ -117,10 +123,9 @@ Before broadcasting each transaction, check that the sender has enough native ga
 
 ### Read-Only Validation Helpers
 
-```bash
-# Resolve sender from private key
-cast wallet address --private-key "$PRIVATE_KEY"
+These checks require the sender's wallet address (`$OWNER`), which is collected as part of [Collect Transaction Inputs](#5-collect-transaction-inputs).
 
+```bash
 # Check native gas token balance (ETH/POL/BNB/etc.)
 cast balance "$OWNER" --rpc-url "$RPC_URL"
 
@@ -135,59 +140,55 @@ cast call "$TOKEN" "allowance(address,address)(uint256)" "$OWNER" "$LOCKUP" --rp
 
 ### Shared Setup
 
-#### 1) Resolve RPC and Key
+#### 1) Resolve RPC and Signing Method
 
 ```bash
 RPC_URL="<resolved-or-user-provided-rpc>"
-PRIVATE_KEY="${ETH_PRIVATE_KEY:-}"
-
-if [[ -z "$PRIVATE_KEY" ]]; then
-  echo "Missing private key. Provide one explicitly or set ETH_PRIVATE_KEY."
-  exit 1
-fi
+SIGNING_METHOD="--browser"  # preferred; falls back to --private-key if --browser errors
 ```
 
 #### 2) Run Preflight Checks
 
-Run all checks from [Preflight Checks](#preflight-checks), set `MSG_VALUE="500000000000000"`, and run the native gas token check before each broadcast (`approve` and stream creation).
+Run all checks from [Preflight Checks](#preflight-checks), set `MSG_VALUE="500000000000000"`, and run the native gas token check before each broadcast (`approve` and stream creation). If an ERC-20 `approve` transaction is needed, execute it before proceeding to step 3.
 
 ### Single Stream
 
-#### 3) Build Preview Tx (No Broadcast)
+#### 3) Preview Transaction (No Broadcast)
 
-For `SablierLockup` stream creation (`create*`), pass the fixed creation fee in `MSG_VALUE`.
-
-```bash
-RAW_TX=$(cast mktx "$LOCKUP" "$FUNCTION_SIG" $FUNCTION_ARGS \
-  --value "$MSG_VALUE" \
-  --rpc-url "$RPC_URL" \
-  --private-key "$PRIVATE_KEY")
-
-echo "Preview raw tx: $RAW_TX"
-```
-
-Decode the calldata for human-readable confirmation:
+Build and display the calldata so the user can review before signing:
 
 ```bash
-cast 4byte-decode $(cast tx "$RAW_TX" input --rpc-url "$RPC_URL" 2>/dev/null || echo "$RAW_TX")
+CALLDATA=$(cast calldata "$FUNCTION_SIG" $FUNCTION_ARGS)
+echo "Calldata: $CALLDATA"
 ```
+
+Present a human-readable summary of the transaction to the user:
+
+- **Contract:** `$LOCKUP`
+- **Function:** the chosen `create*` entrypoint
+- **Recipient, token, amount, shape, duration/timestamps**
+- **Creation fee:** `0.0005 ETH` (`MSG_VALUE`)
 
 #### 4) Require Explicit Confirmation
 
 Use a clear confirmation prompt, for example:
 
-- `Confirm broadcast? Reply exactly: CONFIRM SEND`
+- `Confirm broadcast? Reply exactly: YES`
 
 If the user does not explicitly confirm, stop.
 
 #### 5) Broadcast After Confirmation
 
+A browser tab will open for the user to approve the transaction in their wallet extension.
+
 ```bash
 cast send "$LOCKUP" "$FUNCTION_SIG" $FUNCTION_ARGS \
   --value "$MSG_VALUE" \
   --rpc-url "$RPC_URL" \
-  --private-key "$PRIVATE_KEY"
+  --browser
 ```
+
+If `--browser` fails at runtime, ask the user to provide a private key and retry with `--private-key`.
 
 #### 6) Verify Receipt
 
@@ -214,20 +215,14 @@ CALL_3=$(cast calldata "$FUNCTION_SIG" $ARGS_STREAM_3)
 
 Each `CALL_N` is a complete calldata blob (4-byte selector + ABI-encoded arguments).
 
-#### 4) Build Batch Preview Tx (No Broadcast)
+#### 4) Preview Batch Transaction (No Broadcast)
 
-Pass the encoded calls as a `bytes[]` array to `batch()` on the same `SablierLockup` contract:
+Present a human-readable summary of the batch to the user:
 
-```bash
-RAW_TX=$(cast mktx "$LOCKUP" "batch(bytes[])" "[$CALL_1,$CALL_2,$CALL_3]" \
-  --value "$MSG_VALUE" \
-  --rpc-url "$RPC_URL" \
-  --private-key "$PRIVATE_KEY")
-
-echo "Preview raw tx: $RAW_TX"
-```
-
-Where `MSG_VALUE = 500000000000000` wei (`0.0005 ETH`) for the entire batch.
+- **Contract:** `$LOCKUP`
+- **Function:** `batch(bytes[])`
+- **Number of streams**, each with: recipient, amount, shape, duration
+- **Creation fee:** `0.0005 ETH` (`MSG_VALUE`) for the entire batch
 
 #### 5) Require Explicit Confirmation
 
@@ -235,12 +230,16 @@ Use the same confirmation rule as for a Single Stream: show the transaction deta
 
 #### 6) Broadcast After Confirmation
 
+A browser tab will open for the user to approve the transaction in their wallet extension.
+
 ```bash
 cast send "$LOCKUP" "batch(bytes[])" "[$CALL_1,$CALL_2,$CALL_3]" \
   --value "$MSG_VALUE" \
   --rpc-url "$RPC_URL" \
-  --private-key "$PRIVATE_KEY"
+  --browser
 ```
+
+If `--browser` fails at runtime, ask the user to provide a private key and retry with `--private-key`.
 
 #### 7) Verify Receipt
 
@@ -388,7 +387,7 @@ A single cliff stream of 1000 USDC (6 decimals) with a 90-day cliff and 365-day 
 LOCKUP="<lockup-address>"    # From Supported Chains table
 TOKEN="0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"  # USDC on Ethereum
 MSG_VALUE="500000000000000"  # 0.0005 ETH flat fee
-SENDER=$(cast wallet address --private-key "$PRIVATE_KEY")
+SENDER="0x..."  # User's wallet address
 RECIPIENT="0x..."
 
 cast send "$LOCKUP" \
@@ -398,7 +397,7 @@ cast send "$LOCKUP" \
   "(7776000,31536000)" \
   --value "$MSG_VALUE" \
   --rpc-url "$RPC_URL" \
-  --private-key "$PRIVATE_KEY"
+  --browser
 ```
 
 Notes:
@@ -417,7 +416,7 @@ A batch of three linear streams of 1000 USDC each to different recipients, with 
 LOCKUP="<lockup-address>"    # From Supported Chains table
 TOKEN="0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"  # USDC on Ethereum
 MSG_VALUE="500000000000000"  # 0.0005 ETH flat fee for the entire batch
-SENDER=$(cast wallet address --private-key "$PRIVATE_KEY")
+SENDER="0x..."  # User's wallet address
 FUNCTION_SIG="createWithDurationsLL((address,address,uint128,address,bool,bool,string),(uint128,uint128),(uint40,uint40))"
 
 # Encode each create call
@@ -432,7 +431,7 @@ CALL_3=$(cast calldata "$FUNCTION_SIG" \
 cast send "$LOCKUP" "batch(bytes[])" "[$CALL_1,$CALL_2,$CALL_3]" \
   --value "$MSG_VALUE" \
   --rpc-url "$RPC_URL" \
-  --private-key "$PRIVATE_KEY"
+  --browser
 ```
 
 Notes:

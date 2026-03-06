@@ -87,7 +87,7 @@ If the requested chain is not listed, check [Sablier Lockup deployments](https:/
 Collect before building a transaction:
 
 - `chain` (ID and name)
-- sender wallet address (ask the user — this is their public address, not a secret)
+- sender wallet address (resolved via `cast wallet address --browser` or provided by the user)
 - signing method (`--browser` preferred, `--private-key` as fallback)
 - native gas balance (`ETH` etc.)
 - `SablierLockup` contract address
@@ -123,9 +123,12 @@ Before broadcasting each transaction, check that the sender has enough native ga
 
 ### Read-Only Validation Helpers
 
-These checks require the sender's wallet address (`$OWNER`), which is collected as part of [Collect Transaction Inputs](#5-collect-transaction-inputs).
+Resolve the sender address first via the browser wallet, then run the read-only checks:
 
 ```bash
+# Resolve sender address from browser wallet (opens a browser tab for the user to connect)
+OWNER=$(cast wallet address --browser)
+
 # Check native gas token balance (ETH/POL/BNB/etc.)
 cast balance "$OWNER" --rpc-url "$RPC_URL"
 
@@ -140,11 +143,13 @@ cast call "$TOKEN" "allowance(address,address)(uint256)" "$OWNER" "$LOCKUP" --rp
 
 ### Shared Setup
 
-#### 1) Resolve RPC and Signing Method
+#### 1) Resolve RPC, Signing Method, and Sender Address
 
 ```bash
 RPC_URL="<resolved-or-user-provided-rpc>"
-SIGNING_METHOD="--browser"  # preferred; falls back to --private-key if --browser errors
+
+# Resolve sender address from browser wallet (opens a browser tab for the user to connect)
+OWNER=$(cast wallet address --browser)
 ```
 
 #### 2) Run Preflight Checks
@@ -185,6 +190,7 @@ A browser tab will open for the user to approve the transaction in their wallet 
 cast send "$LOCKUP" "$FUNCTION_SIG" $FUNCTION_ARGS \
   --value "$MSG_VALUE" \
   --rpc-url "$RPC_URL" \
+  --from "$OWNER" \
   --browser
 ```
 
@@ -236,6 +242,7 @@ A browser tab will open for the user to approve the transaction in their wallet 
 cast send "$LOCKUP" "batch(bytes[])" "[$CALL_1,$CALL_2,$CALL_3]" \
   --value "$MSG_VALUE" \
   --rpc-url "$RPC_URL" \
+  --from "$OWNER" \
   --browser
 ```
 
@@ -387,7 +394,7 @@ A single cliff stream of 1000 USDC (6 decimals) with a 90-day cliff and 365-day 
 LOCKUP="<lockup-address>"    # From Supported Chains table
 TOKEN="0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"  # USDC on Ethereum
 MSG_VALUE="500000000000000"  # 0.0005 ETH flat fee
-SENDER="0x..."  # User's wallet address
+SENDER=$(cast wallet address --browser)
 RECIPIENT="0x..."
 
 cast send "$LOCKUP" \
@@ -397,6 +404,7 @@ cast send "$LOCKUP" \
   "(7776000,31536000)" \
   --value "$MSG_VALUE" \
   --rpc-url "$RPC_URL" \
+  --from "$SENDER" \
   --browser
 ```
 
@@ -416,7 +424,7 @@ A batch of three linear streams of 1000 USDC each to different recipients, with 
 LOCKUP="<lockup-address>"    # From Supported Chains table
 TOKEN="0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"  # USDC on Ethereum
 MSG_VALUE="500000000000000"  # 0.0005 ETH flat fee for the entire batch
-SENDER="0x..."  # User's wallet address
+SENDER=$(cast wallet address --browser)
 FUNCTION_SIG="createWithDurationsLL((address,address,uint128,address,bool,bool,string),(uint128,uint128),(uint40,uint40))"
 
 # Encode each create call
@@ -431,6 +439,7 @@ CALL_3=$(cast calldata "$FUNCTION_SIG" \
 cast send "$LOCKUP" "batch(bytes[])" "[$CALL_1,$CALL_2,$CALL_3]" \
   --value "$MSG_VALUE" \
   --rpc-url "$RPC_URL" \
+  --from "$SENDER" \
   --browser
 ```
 

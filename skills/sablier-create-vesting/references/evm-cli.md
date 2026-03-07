@@ -1,10 +1,10 @@
-# EVM CLI Stream Execution
+# EVM CLI Vesting Execution
 
 ## Overview
 
-Use this reference when the user wants the agent to execute EVM transactions on their behalf, such as creating Sablier Lockup streams directly from the terminal.
+Use this reference when the user wants the agent to execute EVM transactions on their behalf, such as creating Sablier Lockup vesting schedules directly from the terminal.
 
-This guide is runbook-first: plan the stream, run preflight checks, preview the transaction, require explicit confirmation, then broadcast and verify.
+This guide is runbook-first: plan the vesting, run preflight checks, preview the transaction, require explicit confirmation, then broadcast and verify.
 
 ## Execution Sequence
 
@@ -71,19 +71,21 @@ Infer the creation mode from the user's request:
 
 | Signal | Mode |
 | --- | --- |
-| One recipient, one stream | **Single Stream** |
-| Multiple recipients or multiple streams | **Batch of Streams** |
-| "create streams for 5 recipients" | **Batch of Streams** |
-| "create a stream for Alice" | **Single Stream** |
+| One recipient, one vesting | **Single Vesting** |
+| Multiple recipients or multiple vestings | **Batch of Vestings** |
+| "create vestings for 5 recipients" | **Batch of Vestings** |
+| "create a vesting for Alice" | **Single Vesting** |
 
 - If ambiguous, ask the user to clarify.
-- For batch requests exceeding **50 streams**, recommend [Sablier Airdrops](https://app.sablier.com/airdrops), which is purpose-built for large-scale token distributions.
+- For batch requests exceeding **50 vestings**, route to `sablier-create-airdrop`. If this skill is unavailable, recommend installing it with:
+
+  ```bash
+  npx skills add sablier-labs/sablier-skills --skill sablier-create-airdrop
+  ```
 
 ### 2) Choose Shape
 
-This reference supports five vesting shapes: **Linear**, **Cliff**, **Unlock in Steps**, **Monthly Unlocks**, and **Timelock**.
-
-Use [Entrypoint Catalog](#entrypoint-catalog) to map the chosen shape to the correct function and calldata encoding.
+This reference supports five vesting shapes: **Linear**, **Cliff**, **Unlock in Steps**, **Monthly Unlocks**, and **Timelock**. Choose one based on the user's description.
 
 - If the vesting shape cannot be inferred from the user's instructions, default to **Linear**.
 - If the user mentions a **cliff** but no other shape, default to **Cliff**.
@@ -91,7 +93,7 @@ Use [Entrypoint Catalog](#entrypoint-catalog) to map the chosen shape to the cor
 
 ### 3) Choose Variant
 
-- **`Durations` variants** (`createWithDurationsLL`, `createWithDurationsLT`): use when the user does not specify a specific start time. The stream starts immediately upon transaction confirmation.
+- **`Durations` variants** (`createWithDurationsLL`, `createWithDurationsLT`): use when the user does not specify a specific start time. The vesting starts immediately upon transaction confirmation.
 - **`Timestamps` variants** (`createWithTimestampsLL`, `createWithTimestampsLT`): use when the user specifies a specific start time (for example, "starting March 15" or "beginning at Unix timestamp 1710460800").
 
 ### 4) Resolve Chain and `SablierLockup`
@@ -112,7 +114,7 @@ Collect these before building any transaction:
 - signing method (`--browser` preferred, `--private-key` fallback)
 - native gas balance (`ETH` etc.)
 - `SablierLockup` contract address
-- recipient count and number of streams
+- recipient count and number of vestings
 - token, deposit amount, and approval requirements
 - function signature and arguments (see [Entrypoint Catalog](#entrypoint-catalog))
 
@@ -120,27 +122,41 @@ Collect these before building any transaction:
 
 Run these checks before previewing or broadcasting any state-changing transaction.
 
-### Stream Creation Fee (`MSG_VALUE`)
+### Creation Fee (`MSG_VALUE`)
 
-For stream creation transactions, hard-code `MSG_VALUE` to `500000000000000` wei (`0.0005 ETH`, approximately **$1 USD**).
+The creation fee is approximately **$1 USD** worth of the chain's native asset. Calculate it dynamically before each transaction.
 
-- Use the same flat fee for both **Single Stream** and **Batch of Streams** transactions.
-- Do not browse the web or look up ETH/native-token prices.
+**Procedure:**
+
+1. Look up the `CoinGecko ID` for the chain's native asset from the [Supported Chains](#supported-chains) table.
+2. Use the `coingecko-api` skill to fetch the current USD price of the native asset by its CoinGecko ID. If this skill is unavailable, recommend installing it with:
+
+   ```bash
+   npx skills add sablier-labs/agent-skills --skill coingecko-api
+   ```
+
+3. Calculate MSG_VALUE as $1 USD worth of native asset in wei:
+
+   ```bash
+   MSG_VALUE=$(cast to-wei $(echo "scale=18; 1 / $PRICE" | bc) ether)
+   ```
+
+- Use the same fee for both **Single Vesting** and **Batch of Vestings** transactions.
 - Before sending, verify the wallet has enough native token for both `MSG_VALUE` and gas.
 
 ### Allowance and Token Balance
 
-For stream creation:
+For vesting creation:
 
 1. **ERC-20 allowance.** Check `allowance(owner, lockup)`. The required allowance depends on mode:
-   - **Single Stream:** `DEPOSIT_AMOUNT`
-   - **Batch of Streams:** sum of `DEPOSIT_AMOUNT` across all streams
-   If allowance is below the required total, send an `approve` transaction to raise allowance before attempting stream creation.
-2. **ERC-20 token balance.** Check `balanceOf(owner)` is at least the total deposit amount (single-stream deposit or the sum of all batch deposits). If balance is insufficient, stop execution and inform the user they need more tokens (for example, obtain or purchase via Uniswap) before continuing.
+   - **Single Vesting:** `DEPOSIT_AMOUNT`
+   - **Batch of Vestings:** sum of `DEPOSIT_AMOUNT` across all vestings
+   If allowance is below the required total, send an `approve` transaction to raise allowance before attempting vesting creation.
+2. **ERC-20 token balance.** Check `balanceOf(owner)` is at least the total deposit amount (single deposit or the sum of all batch deposits). If balance is insufficient, stop execution and inform the user they need more tokens (for example, obtain or purchase via Uniswap) before continuing.
 
 ### Native Gas Balance for Every Transaction
 
-Before broadcasting each transaction, check that the sender has enough native gas token (ETH/POL/BNB/etc.) to pay transaction fees. Run this check again before each broadcast (`approve` and stream creation). If balance is insufficient, stop and tell the user to fund their wallet first. Recommend buying via [Transak](https://transak.com/buy).
+Before broadcasting each transaction, check that the sender has enough native gas token (ETH/POL/BNB/etc.) to cover both gas fees and the creation fee (`MSG_VALUE`). Run this check again before each broadcast (`approve` and vesting creation). If balance is insufficient, stop and tell the user to fund their wallet first. Recommend buying via [Transak](https://transak.com/buy).
 
 ### Read-Only Validation Commands
 
@@ -175,9 +191,9 @@ OWNER=$(cast wallet address --browser)
 
 #### 2) Run preflight checks and handle `approve` if needed
 
-Run all checks from [Preflight Checks](#preflight-checks), set `MSG_VALUE="500000000000000"`, and re-run the native gas check before each broadcast (`approve` and stream creation). If an ERC-20 `approve` transaction is needed, execute it before continuing to step 3.
+Run all checks from [Preflight Checks](#preflight-checks), calculate `MSG_VALUE` per the [Creation Fee](#creation-fee-msg_value) section, and re-run the native gas check before each broadcast (`approve` and vesting creation). If an ERC-20 `approve` transaction is needed, execute it before continuing to step 3.
 
-### Single Stream Flow
+### Single Vesting Flow
 
 #### 3) Preview Transaction (No Broadcast)
 
@@ -193,7 +209,7 @@ Present a human-readable summary:
 - **Contract:** `$LOCKUP`
 - **Function:** chosen `create*` entrypoint
 - **Recipient, token, amount, shape, duration/timestamps**
-- **Creation fee:** `0.0005 ETH` (`MSG_VALUE`)
+- **Creation fee:** ~$1 USD in native token (`MSG_VALUE`)
 
 #### 4) Require Explicit Confirmation
 
@@ -225,19 +241,19 @@ cast receipt "$TX_HASH" --rpc-url "$RPC_URL"
 
 #### 7) Direct User to the Sablier App
 
-After successful confirmation, inform the user they can view and manage streams at [app.sablier.com](https://app.sablier.com).
+After successful confirmation, inform the user they can view and manage vestings at [app.sablier.com](https://app.sablier.com).
 
 ### Batch Flow
 
 #### 3) Encode Individual Create Calls
 
-For each stream, ABI-encode the full `create*` calldata using `cast calldata`:
+For each vesting, ABI-encode the full `create*` calldata using `cast calldata`:
 
 ```bash
-CALL_1=$(cast calldata "$FUNCTION_SIG" $ARGS_STREAM_1)
-CALL_2=$(cast calldata "$FUNCTION_SIG" $ARGS_STREAM_2)
-CALL_3=$(cast calldata "$FUNCTION_SIG" $ARGS_STREAM_3)
-# ... repeat for each stream
+CALL_1=$(cast calldata "$FUNCTION_SIG" $ARGS_VESTING_1)
+CALL_2=$(cast calldata "$FUNCTION_SIG" $ARGS_VESTING_2)
+CALL_3=$(cast calldata "$FUNCTION_SIG" $ARGS_VESTING_3)
+# ... repeat for each vesting
 ```
 
 Each `CALL_N` is a complete calldata blob (4-byte selector + ABI-encoded arguments).
@@ -248,12 +264,12 @@ Present a human-readable summary:
 
 - **Contract:** `$LOCKUP`
 - **Function:** `batch(bytes[])`
-- **Number of streams**, each with: recipient, amount, shape, duration
-- **Creation fee:** `0.0005 ETH` (`MSG_VALUE`) for the entire batch
+- **Number of vestings**, each with: recipient, amount, shape, duration
+- **Creation fee:** ~$1 USD in native token (`MSG_VALUE`) for the entire batch
 
 #### 5) Require Explicit Confirmation
 
-Apply the same confirmation rule as Single Stream: show transaction details and require explicit user confirmation before broadcast.
+Apply the same confirmation rule as Single Vesting: show transaction details and require explicit user confirmation before broadcast.
 
 #### 6) Broadcast After Confirmation
 
@@ -277,11 +293,11 @@ cast receipt "$TX_HASH" --rpc-url "$RPC_URL"
 
 #### 8) Direct User to the Sablier App
 
-After successful confirmation, inform the user they can view and manage streams at [app.sablier.com](https://app.sablier.com).
+After successful confirmation, inform the user they can view and manage vestings at [app.sablier.com](https://app.sablier.com).
 
 ## Entrypoint Catalog
 
-Use this section after intake to map the vesting schedule to the correct `SablierLockup` function and calldata shape. Refer to ABI definitions in [lockup-v3.0-abi.json](../assets/lockup-v3.0-abi.json) for exact tuple encoding.
+Maps each vesting shape to the correct `SablierLockup` function and calldata encoding. Refer to ABI definitions in [lockup-v3.0-abi.json](../assets/lockup-v3.0-abi.json) for exact tuple encoding.
 
 ### Shape-to-Function Mapping
 
@@ -293,7 +309,7 @@ Use this section after intake to map the vesting schedule to the correct `Sablie
 | Monthly Unlocks | `createWithDurationsLT` | `createWithTimestampsLT` | `"tranchedMonthly"` |
 | Timelock | `createWithDurationsLL` | `createWithTimestampsLL` | `"linearTimelock"` |
 
-Use `Durations` variants when the stream should start immediately upon confirmation. Use `Timestamps` variants when the user provides specific start or unlock times.
+Use `Durations` variants when the vesting should start immediately upon confirmation. Use `Timestamps` variants when the user provides specific start or unlock times.
 
 ### `createWithDurationsLL`
 
@@ -310,7 +326,7 @@ createWithDurationsLL(
 **Arguments:**
 
 1. **params** tuple - `(sender, recipient, depositAmount, token, cancelable, transferable, shape)`
-2. **unlockAmounts** tuple - `(start, cliff)` - amounts unlocked instantly at stream start and at cliff time
+2. **unlockAmounts** tuple - `(start, cliff)` - amounts unlocked instantly at vesting start and at cliff time
 3. **durations** tuple - `(cliff, total)` - durations in seconds
 
 **Shape-specific encoding:**
@@ -336,7 +352,7 @@ createWithTimestampsLL(
 **Arguments:**
 
 1. **params** tuple - `(sender, recipient, depositAmount, token, cancelable, transferable, (startTimestamp, endTimestamp), shape)`
-2. **unlockAmounts** tuple - `(start, cliff)` - amounts unlocked instantly at stream start and at cliff time
+2. **unlockAmounts** tuple - `(start, cliff)` - amounts unlocked instantly at vesting start and at cliff time
 3. **cliffTime** - Unix timestamp for the cliff; set to `0` if no cliff
 
 **Shape-specific encoding:**
@@ -391,11 +407,11 @@ createWithTimestampsLT(
 | Shape | Tranche Construction |
 | --- | --- |
 | Unlock in Steps | Equal amounts at equally spaced timestamps |
-| Monthly Unlocks | Equal amounts at monthly timestamps (add 30 days per tranche to start) |
+| Monthly Unlocks | Equal amounts at monthly timestamps (tranche N unlocks at start + N × 30 days) |
 
 ### `batch`
 
-Used to create **multiple streams in a single transaction**. Each element in the `calls` array is a fully ABI-encoded `create*` calldata.
+Used to create **multiple vestings in a single transaction**. Each element in the `calls` array is a fully ABI-encoded `create*` calldata.
 
 ```
 batch(bytes[] calls)
@@ -407,14 +423,14 @@ batch(bytes[] calls)
 
 ## Worked Examples
 
-### Single Stream: `createWithDurationsLL`
+### Single Vesting: `createWithDurationsLL`
 
-A single cliff stream of 1000 USDC (6 decimals) with a 90-day cliff and 365-day total duration on Ethereum mainnet:
+A single cliff vesting of 1000 USDC (6 decimals) with a 90-day cliff and 365-day total duration on Ethereum mainnet:
 
 ```bash
 LOCKUP="<lockup-address>"    # From Supported Chains table
 TOKEN="0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"  # USDC on Ethereum
-MSG_VALUE="500000000000000"  # 0.0005 ETH flat fee
+# Calculate MSG_VALUE per the "Creation Fee" section
 SENDER=$(cast wallet address --browser)
 RECIPIENT="0x..."
 
@@ -435,16 +451,16 @@ Notes:
 - `cliff` selects the Cliff shape
 - `(0,0)` = no start unlock and no lump-sum cliff unlock amount
 - `(7776000,31536000)` = 90-day cliff and 365-day total duration, both in seconds
-- `MSG_VALUE` = `500000000000000` wei (`0.0005 ETH`)
+- `MSG_VALUE` = ~$1 USD worth of native token (see [Creation Fee](#creation-fee-msg_value))
 
-### Batch of Streams: 3x `createWithDurationsLL`
+### Batch of Vestings: 3x `createWithDurationsLL`
 
-A batch of three linear streams of 1000 USDC each to different recipients, with a 365-day duration and no cliff, on Ethereum mainnet:
+A batch of three linear vestings of 1000 USDC each to different recipients, with a 365-day duration and no cliff, on Ethereum mainnet:
 
 ```bash
 LOCKUP="<lockup-address>"    # From Supported Chains table
 TOKEN="0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"  # USDC on Ethereum
-MSG_VALUE="500000000000000"  # 0.0005 ETH flat fee for the entire batch
+# Calculate MSG_VALUE per the "Creation Fee" section
 SENDER=$(cast wallet address --browser)
 FUNCTION_SIG="createWithDurationsLL((address,address,uint128,address,bool,bool,string),(uint128,uint128),(uint40,uint40))"
 
@@ -456,7 +472,6 @@ CALL_2=$(cast calldata "$FUNCTION_SIG" \
 CALL_3=$(cast calldata "$FUNCTION_SIG" \
   "($SENDER,0xRecipient3,1000000000,$TOKEN,true,true,linear)" "(0,0)" "(0,31536000)")
 
-# MSG_VALUE = 500000000000000 (0.0005 ETH flat fee for the entire batch)
 cast send "$LOCKUP" "batch(bytes[])" "[$CALL_1,$CALL_2,$CALL_3]" \
   --value "$MSG_VALUE" \
   --rpc-url "$RPC_URL" \
@@ -468,43 +483,45 @@ Notes:
 
 - ERC-20 approval must cover the total deposit: 3 × 1000000000 = 3000000000 (3000 USDC)
 - `linear` selects the Linear shape
-- `MSG_VALUE` = `500000000000000` wei (`0.0005 ETH`) for the entire batch
-- All three streams use the same `SablierLockup` contract and the same `batch()` entrypoint
-- For more than 50 streams, use [Sablier Airdrops](https://app.sablier.com/airdrops) instead
+- `MSG_VALUE` = ~$1 USD worth of native token for the entire batch
+- All three vestings use the same `SablierLockup` contract and the same `batch()` entrypoint
+- For more than 50 vestings, route to `sablier-create-airdrop`
 
 ## Supported Chains
 
-Use this registry to resolve chain metadata, RPC endpoints, and `SablierLockup` contract addresses:
+Use this registry to resolve chain metadata, RPC endpoints, native asset pricing, and `SablierLockup` contract addresses:
 
-| Chain | Chain ID | SablierLockup | RPC URL |
-| --- | --- | --- | --- |
-| Ethereum | `1` | `0xcF8ce57fa442ba50aCbC57147a62aD03873FfA73` | `https://ethereum-rpc.publicnode.com` |
-| Abstract | `2741` | `0x293d8d192C0C93225FF6bBE7415a56B57379bbA3` | `https://api.mainnet.abs.xyz` |
-| Arbitrum | `42161` | `0xF12AbfB041b5064b839Ca56638cDB62fEA712Db5` | `https://arb1.arbitrum.io/rpc` |
-| Avalanche | `43114` | `0x7e146250Ed5CCCC6Ada924D456947556902acaFD` | `https://api.avax.network/ext/bc/C/rpc` |
-| Base | `8453` | `0xe261b366f231b12fcb58d6bbd71e57faee82431d` | `https://mainnet.base.org` |
-| Berachain | `80094` | `0xC37B51a3c3Be55f0B34Fbd8Bd1F30cFF6d251408` | `https://rpc.berachain.com` |
-| Blast | `81457` | `0xcD16d89cc79Ab0b52717A46b8A3F73E61014c7dc` | `https://rpc.blast.io` |
-| BNB Chain | `56` | `0x06bd1Ec1d80acc45ba332f79B08d2d9e24240C74` | `https://bsc-dataseed1.bnbchain.org` |
-| Chiliz | `88888` | `0x957a54aC691893B20c705e0b2EecbDDF5220d019` | `https://rpc.chiliz.com` |
-| Core Dao | `1116` | `0x01Fed2aB51A830a3AF3AE1AB817dF1bA4F152bB0` | `https://rpc.coredao.org` |
-| Denergy | `369369` | `0x9f5d28C8ed7F09e65519C1f6f394e523524cA38F` | `https://rpc.d.energy` |
-| Gnosis | `100` | `0x87f87Eb0b59421D1b2Df7301037e923932176681` | `https://rpc.gnosischain.com` |
-| HyperEVM | `999` | `0x50ff828e66612A4D1F7141936F2B4078C7356329` | `https://rpc.hyperliquid.xyz/evm` |
-| Lightlink | `1890` | `0xA4f1f4a5C55b5d9372CBB29112b14e1912A23d9D` | `https://replicator.phoenix.lightlink.io/rpc/v1` |
-| Linea Mainnet | `59144` | `0xc853DB30a908dC1b655bbd4A8B9d5DB8588C13c8` | `https://rpc.linea.build` |
-| Mode | `34443` | `0x9513CE572D4f4AAc1Dd493bcd50866235D1c698d` | `https://mainnet.mode.network` |
-| Monad | `143` | `0x003F5393F4836f710d492AD98D89F5BFCCF1C962` | `https://rpc.monad.xyz` |
-| Morph | `2818` | `0xE646D9A037c6B62e4d417592A10f57e77f007a27` | `https://rpc.morphl2.io` |
-| OP Mainnet | `10` | `0xe2620fB20fC9De61CD207d921691F4eE9d0fffd0` | `https://mainnet.optimism.io` |
-| Polygon | `137` | `0x1E901b0E05A78C011D6D4cfFdBdb28a42A1c32EF` | `https://polygon-bor-rpc.publicnode.com` |
-| Scroll | `534352` | `0xcb60a39942CD5D1c2a1C8aBBEd99C43A73dF3f8d` | `https://rpc.scroll.io` |
-| Sei Network | `1329` | `0x1d96e9d05f6910d22876177299261290537cfBBc` | `https://evm-rpc.sei-apis.com` |
-| Sonic | `146` | `0x763Cfb7DF1D1BFe50e35E295688b3Df789D2feBB` | `https://rpc.soniclabs.com` |
-| Superseed | `5330` | `0x2F1c6AD6306Bd0200D55b59AD54d4b44067D00E6` | `https://mainnet.superseed.xyz` |
-| Unichain | `130` | `0xfFb540fC132dCefb0Fdef96ef63FE2f2F1BD7CFd` | `https://mainnet.unichain.org` |
-| XDC | `50` | `0x2266901B1EcF499b4c91B6cBeA8e06700cFbde1e` | `https://rpc.xinfin.network` |
-| ZKsync Era | `324` | `0xC07E338Ce1aEd183A8b3c55f980548f5E463b5c5` | `https://mainnet.era.zksync.io` |
-| Sepolia | `11155111` | `0x6b0307b4338f2963A62106028E3B074C2c0510DA` | `https://ethereum-sepolia-rpc.publicnode.com` |
+| Chain | Chain ID | Native Asset | CoinGecko ID | SablierLockup | RPC URL |
+| --- | --- | --- | --- | --- | --- |
+| Ethereum | `1` | ETH | `ethereum` | `0xcF8ce57fa442ba50aCbC57147a62aD03873FfA73` | `https://ethereum-rpc.publicnode.com` |
+| Abstract | `2741` | ETH | `ethereum` | `0x293d8d192C0C93225FF6bBE7415a56B57379bbA3` | `https://api.mainnet.abs.xyz` |
+| Arbitrum | `42161` | ETH | `ethereum` | `0xF12AbfB041b5064b839Ca56638cDB62fEA712Db5` | `https://arb1.arbitrum.io/rpc` |
+| Avalanche | `43114` | AVAX | `avalanche-2` | `0x7e146250Ed5CCCC6Ada924D456947556902acaFD` | `https://api.avax.network/ext/bc/C/rpc` |
+| Base | `8453` | ETH | `ethereum` | `0xe261b366f231b12fcb58d6bbd71e57faee82431d` | `https://mainnet.base.org` |
+| Berachain | `80094` | BERA | `berachain` | `0xC37B51a3c3Be55f0B34Fbd8Bd1F30cFF6d251408` | `https://rpc.berachain.com` |
+| Blast | `81457` | ETH | `ethereum` | `0xcD16d89cc79Ab0b52717A46b8A3F73E61014c7dc` | `https://rpc.blast.io` |
+| BNB Chain | `56` | BNB | `binancecoin` | `0x06bd1Ec1d80acc45ba332f79B08d2d9e24240C74` | `https://bsc-dataseed1.bnbchain.org` |
+| Chiliz | `88888` | CHZ | `chiliz` | `0x957a54aC691893B20c705e0b2EecbDDF5220d019` | `https://rpc.chiliz.com` |
+| Core Dao | `1116` | CORE | `coredaoorg` | `0x01Fed2aB51A830a3AF3AE1AB817dF1bA4F152bB0` | `https://rpc.coredao.org` |
+| Denergy | `369369` | WATT | — | `0x9f5d28C8ed7F09e65519C1f6f394e523524cA38F` | `https://rpc.d.energy` |
+| Gnosis | `100` | xDAI | `dai` | `0x87f87Eb0b59421D1b2Df7301037e923932176681` | `https://rpc.gnosischain.com` |
+| HyperEVM | `999` | HYPE | `hyperliquid` | `0x50ff828e66612A4D1F7141936F2B4078C7356329` | `https://rpc.hyperliquid.xyz/evm` |
+| Lightlink | `1890` | ETH | `ethereum` | `0xA4f1f4a5C55b5d9372CBB29112b14e1912A23d9D` | `https://replicator.phoenix.lightlink.io/rpc/v1` |
+| Linea Mainnet | `59144` | ETH | `ethereum` | `0xc853DB30a908dC1b655bbd4A8B9d5DB8588C13c8` | `https://rpc.linea.build` |
+| Mode | `34443` | ETH | `ethereum` | `0x9513CE572D4f4AAc1Dd493bcd50866235D1c698d` | `https://mainnet.mode.network` |
+| Monad | `143` | MON | `monad` | `0x003F5393F4836f710d492AD98D89F5BFCCF1C962` | `https://rpc.monad.xyz` |
+| Morph | `2818` | ETH | `ethereum` | `0xE646D9A037c6B62e4d417592A10f57e77f007a27` | `https://rpc.morphl2.io` |
+| OP Mainnet | `10` | ETH | `ethereum` | `0xe2620fB20fC9De61CD207d921691F4eE9d0fffd0` | `https://mainnet.optimism.io` |
+| Polygon | `137` | POL | `polygon` | `0x1E901b0E05A78C011D6D4cfFdBdb28a42A1c32EF` | `https://polygon-bor-rpc.publicnode.com` |
+| Scroll | `534352` | ETH | `ethereum` | `0xcb60a39942CD5D1c2a1C8aBBEd99C43A73dF3f8d` | `https://rpc.scroll.io` |
+| Sei Network | `1329` | SEI | `sei` | `0x1d96e9d05f6910d22876177299261290537cfBBc` | `https://evm-rpc.sei-apis.com` |
+| Sonic | `146` | S | `sonic` | `0x763Cfb7DF1D1BFe50e35E295688b3Df789D2feBB` | `https://rpc.soniclabs.com` |
+| Superseed | `5330` | ETH | `ethereum` | `0x2F1c6AD6306Bd0200D55b59AD54d4b44067D00E6` | `https://mainnet.superseed.xyz` |
+| Unichain | `130` | ETH | `ethereum` | `0xfFb540fC132dCefb0Fdef96ef63FE2f2F1BD7CFd` | `https://mainnet.unichain.org` |
+| XDC | `50` | XDC | `xdc-network` | `0x2266901B1EcF499b4c91B6cBeA8e06700cFbde1e` | `https://rpc.xinfin.network` |
+| ZKsync Era | `324` | ETH | `ethereum` | `0xC07E338Ce1aEd183A8b3c55f980548f5E463b5c5` | `https://mainnet.era.zksync.io` |
+| Sepolia | `11155111` | ETH | `ethereum` | `0x6b0307b4338f2963A62106028E3B074C2c0510DA` | `https://ethereum-sepolia-rpc.publicnode.com` |
 
 Ethereum can also be referred to as "Mainnet".
+
+> **Note:** Denergy (WATT) is not listed on CoinGecko. Use web search to find the current price of WATT in USD.

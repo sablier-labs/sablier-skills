@@ -2,7 +2,7 @@
 
 ## Overview
 
-Use this reference when the user wants the agent to execute EVM transactions on their behalf, such as creating Sablier Lockup vesting schedules directly from the terminal.
+Use this reference when the user wants the agent to execute EVM transactions on their behalf, such as creating Sablier Lockup vestings directly from the terminal.
 
 This guide is runbook-first: plan the vesting, run preflight checks, preview the transaction, require explicit confirmation, then broadcast and verify.
 

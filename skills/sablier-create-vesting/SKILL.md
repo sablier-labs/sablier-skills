@@ -10,7 +10,7 @@ description: This skill should be used when the user asks to create "token vesti
 
 ## Overview
 
-Create fixed-schedule token vesting schedules using the Sablier Lockup protocol. Lockup vesting schedules lock tokens upfront and release them over time according to a defined schedule. Each vesting mints an NFT to the recipient.
+Create fixed-schedule token vestings using the Sablier Lockup protocol. Lockup vestings lock tokens upfront and release them over time according to a defined schedule. Each vesting mints an NFT to the recipient.
 
 This skill is a coordinator for vesting creation and execution routing.
 

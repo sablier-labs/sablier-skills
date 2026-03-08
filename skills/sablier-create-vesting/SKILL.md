@@ -6,11 +6,11 @@ argument-hint: <chain_name> <token_address> <vesting_details>
 description: This skill should be used when the user asks to create "token vesting", "token vesting streams", "onchain vesting", "Ethereum vesting", "EVM vesting", "Solana vesting", "ERC-20 vesting", "ERC20 vesting", "BEP-20 vesting", or "BEP20 vesting" with Sablier Lockup, wants to create vesting schedules for a token or tokens on Ethereum, EVM-compatible chains, BNB Chain, or Solana, needs an agent to run onchain vesting-creation transactions on their behalf.
 ---
 
-# Sablier Vesting Creation
+# Sablier Vesting Stream Creation
 
 ## Overview
 
-Create fixed-schedule token vestings using the Sablier Lockup protocol. Lockup vestings lock tokens upfront and release them over time according to a defined schedule. Each vesting mints an NFT to the recipient.
+Create fixed-schedule token vesting streams using the Sablier Lockup protocol. Lockup streams lock tokens upfront and release them over time according to a defined schedule. Each stream mints an NFT to the recipient.
 
 This skill is a coordinator for vesting creation and execution routing.
 
@@ -70,7 +70,7 @@ Do not guess or silently apply defaults for these parameters. Only proceed once 
 ### 6. Route in two steps
 
 1. Classify the request as one of:
-   - Vesting execution on the user's behalf
+   - Vesting creation on the user's behalf
    - Onchain integration guidance
    - Any other integration type (frontend, backend, indexer, etc.)
 2. If the request is any other integration type, inform the user this skill does not support non-onchain integrations and stop.
@@ -78,7 +78,7 @@ Do not guess or silently apply defaults for these parameters. Only proceed once 
 
 | Intent | EVM | Solana |
 | --- | --- | --- |
-| Vesting execution on the user's behalf | Use [evm-cli.md](references/evm-cli.md) | Not yet supported. Direct the user to [solana.sablier.com](https://solana.sablier.com) and suggest sending the Sablier team a feature request. |
+| Vesting creation on the user's behalf | Use [evm-cli.md](references/evm-cli.md) | Not yet supported. Direct the user to [solana.sablier.com](https://solana.sablier.com) and suggest sending the Sablier team a feature request. |
 | Onchain integration guidance | Use [evm-onchain.md](references/evm-onchain.md) | Inform the user this skill does not currently support Solana onchain integration. Direct them to [docs.sablier.com](https://docs.sablier.com/solana/sablier-on-solana). |
 
 ## Resources

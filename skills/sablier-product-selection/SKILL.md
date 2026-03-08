@@ -18,7 +18,7 @@ Sablier offers three products for onchain token distribution. This skill helps c
 **Creation skills:**
 
 - Lockup streams (LL, LD, LT) → `sablier-create-vesting`
-- Flow streams → `sablier-flow-creation` (coming soon)
+- Flow streams → `sablier-create-payment`
 - Merkle Airdrops → `sablier-create-airdrop` (coming soon)
 
 ## Decision Tree
@@ -55,16 +55,16 @@ Q6: Must you use Solana?
 └─ No ──► Q7
 
 Q7: Is the payment open-ended (no fixed end date)?
-├─ Yes ──► ✅ Flow on EVM — see `sablier-flow-creation` (coming soon)
+├─ Yes ──► ✅ Flow on EVM — see `sablier-create-payment`
 └─ No ──► Q8
 
 Q8: Do you need to adjust the payment rate over time?
-├─ Yes ──► ✅ Flow on EVM — see `sablier-flow-creation` (coming soon)
+├─ Yes ──► ✅ Flow on EVM — see `sablier-create-payment`
 └─ No ──► Q9
 
 Q9: Do you want periodic payouts (e.g., monthly salary tranches)?
 ├─ Yes ──► ✅ LT (Tranched) on EVM — see `sablier-create-vesting`
-└─ No (continuous streaming) ──► ✅ Flow on EVM — see `sablier-flow-creation` (coming soon)
+└─ No (continuous streaming) ──► ✅ Flow on EVM — see `sablier-create-payment`
 
 Q10: Do you want periodic payouts (e.g., monthly salary tranches)?
 ├─ Yes ──► ✅ LT (Tranched) on Solana — see `sablier-create-vesting`
@@ -80,9 +80,9 @@ Q10: Do you want periodic payouts (e.g., monthly salary tranches)?
 | Quarterly/monthly unlocks     | LT          | EVM + Solana | `sablier-create-vesting`                |
 | Milestone-based unlocks       | LT          | EVM + Solana | `sablier-create-vesting`                |
 | Custom unlock curve           | LD          | EVM only     | `sablier-create-vesting`                |
-| Open-ended payroll            | Flow        | EVM only     | `sablier-flow-creation` (coming soon)   |
-| Adjustable-rate payroll       | Flow        | EVM only     | `sablier-flow-creation` (coming soon)   |
-| Continuous payroll (EVM)      | Flow        | EVM only     | `sablier-flow-creation` (coming soon)   |
+| Open-ended payroll            | Flow        | EVM only     | `sablier-create-payment`   |
+| Adjustable-rate payroll       | Flow        | EVM only     | `sablier-create-payment`   |
+| Continuous payroll (EVM)      | Flow        | EVM only     | `sablier-create-payment`   |
 | Payroll with monthly tranches | LT          | EVM + Solana | `sablier-create-vesting`                |
 | Continuous payroll (Solana)   | LL          | Solana       | `sablier-create-vesting`                |
 | Airdrop to many recipients    | Merkle      | EVM + Solana | `sablier-create-airdrop` (coming soon)  |

@@ -156,11 +156,27 @@ For stream creation:
    - **Single Stream:** `DEPOSIT_AMOUNT`
    - **Batch of Streams:** sum of `DEPOSIT_AMOUNT` across all streams
    If allowance is below the required total, send an `approve` transaction to raise allowance before attempting stream creation.
-2. **ERC-20 token balance.** Check `balanceOf(owner)` is at least the total deposit amount (single-stream deposit or the sum of all batch deposits). If balance is insufficient, stop execution and inform the user they need more tokens (for example, obtain or purchase via Uniswap) before continuing.
+2. **ERC-20 token balance.** Check `balanceOf(owner)` is at least the total deposit amount (single-stream deposit or the sum of all batch deposits). If balance is insufficient, stop execution and inform the user they need more tokens (for example, purchase via Uniswap) before continuing.
 
 ### Native Gas Balance for Every Transaction
 
-Before broadcasting each transaction, check that the sender has enough native gas token (ETH/POL/BNB/etc.) to cover both gas fees and the creation fee (`MSG_VALUE`). Run this check again before each broadcast (`approve` and stream creation). If balance is insufficient, stop and tell the user to fund their wallet first. Recommend buying via [Transak](https://transak.com/buy).
+Before broadcasting each transaction, estimate the gas cost and verify the sender can cover both gas and the creation fee (`MSG_VALUE`):
+
+```bash
+# Estimate gas for the transaction (returns gas units)
+GAS_ESTIMATE=$(cast estimate "$LOCKUP" "$FUNCTION_SIG" $FUNCTION_ARGS \
+  --value "$MSG_VALUE" \
+  --rpc-url "$RPC_URL" \
+  --from "$OWNER")
+
+# Get current gas price (in wei)
+GAS_PRICE=$(cast gas-price --rpc-url "$RPC_URL")
+
+# Total native token needed = (gas estimate × gas price) + MSG_VALUE
+TOTAL_NEEDED=$(echo "$GAS_ESTIMATE * $GAS_PRICE + $MSG_VALUE" | bc)
+```
+
+Compare `TOTAL_NEEDED` against the sender's native balance. Run this check before each broadcast (`approve` and stream creation). If balance is insufficient, stop and tell the user to fund their wallet first. Recommend buying via [Transak](https://transak.com/buy).
 
 ### Read-Only Validation Commands
 

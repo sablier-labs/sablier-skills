@@ -1,10 +1,10 @@
-# EVM CLI Vesting Execution
+# EVM CLI Stream Execution
 
 ## Overview
 
-Use this reference when the user wants the agent to execute EVM transactions on their behalf, such as creating Sablier Lockup vestings directly from the terminal.
+Use this reference when the user wants the agent to execute EVM transactions on their behalf, such as creating Sablier Lockup streams directly from the terminal.
 
-This guide is runbook-first: plan the vesting, run preflight checks, preview the transaction, require explicit confirmation, then broadcast and verify.
+This guide is runbook-first: plan the stream, run preflight checks, preview the transaction, require explicit confirmation, then broadcast and verify.
 
 ## Execution Sequence
 
@@ -71,13 +71,13 @@ Infer the creation mode from the user's request:
 
 | Signal | Mode |
 | --- | --- |
-| One recipient, one vesting | **Single Vesting** |
-| Multiple recipients or multiple vestings | **Batch of Vestings** |
-| "create vestings for 5 recipients" | **Batch of Vestings** |
-| "create a vesting for Alice" | **Single Vesting** |
+| One recipient, one stream | **Single Stream** |
+| Multiple recipients or multiple streams | **Batch of Streams** |
+| "create streams for 5 recipients" | **Batch of Streams** |
+| "create a stream for Alice" | **Single Stream** |
 
 - If ambiguous, ask the user to clarify.
-- For batch requests exceeding **50 vestings**, route to `sablier-create-airdrop`. If this skill is unavailable, recommend installing it with:
+- For batch requests exceeding **50 streams**, route to `sablier-create-airdrop`. If this skill is unavailable, recommend installing it with:
 
   ```bash
   npx skills add sablier-labs/sablier-skills --skill sablier-create-airdrop
@@ -93,7 +93,7 @@ This reference supports five vesting shapes: **Linear**, **Cliff**, **Unlock in 
 
 ### 3) Choose Variant
 
-- **`Durations` variants** (`createWithDurationsLL`, `createWithDurationsLT`): use when the user does not specify a specific start time. The vesting starts immediately upon transaction confirmation.
+- **`Durations` variants** (`createWithDurationsLL`, `createWithDurationsLT`): use when the user does not specify a specific start time. The stream starts immediately upon transaction confirmation.
 - **`Timestamps` variants** (`createWithTimestampsLL`, `createWithTimestampsLT`): use when the user specifies a specific start time (for example, "starting March 15" or "beginning at Unix timestamp 1710460800").
 
 ### 4) Resolve Chain and `SablierLockup`
@@ -114,7 +114,7 @@ Collect these before building any transaction:
 - signing method (`--browser` preferred, `--private-key` fallback)
 - native gas balance (`ETH` etc.)
 - `SablierLockup` contract address
-- recipient count and number of vestings
+- recipient count and number of streams
 - token, deposit amount, and approval requirements
 - function signature and arguments (see [Entrypoint Catalog](#entrypoint-catalog))
 
@@ -124,7 +124,7 @@ Run these checks before previewing or broadcasting any state-changing transactio
 
 ### Creation Fee (`MSG_VALUE`)
 
-The creation fee is approximately **$1 USD** worth of the chain's native asset. Calculate it dynamically before each transaction.
+The creation fee is approximately **~$1 USD** worth of the chain's native asset. Calculate it dynamically before each transaction.
 
 **Procedure:**
 
@@ -135,28 +135,29 @@ The creation fee is approximately **$1 USD** worth of the chain's native asset. 
    npx skills add sablier-labs/agent-skills --skill coingecko-api
    ```
 
-3. Calculate MSG_VALUE as $1 USD worth of native asset in wei:
+3. Calculate MSG_VALUE as ~$1 USD worth of native asset in wei:
 
    ```bash
+   # "ether" here means the 18-decimal unit, not the ETH asset — all EVM native assets use 18 decimals
    MSG_VALUE=$(cast to-wei $(echo "scale=18; 1 / $PRICE" | bc) ether)
    ```
 
-- Use the same fee for both **Single Vesting** and **Batch of Vestings** transactions.
+- Use the same fee for both **Single Stream** and **Batch of Streams** transactions.
 - Before sending, verify the wallet has enough native token for both `MSG_VALUE` and gas.
 
 ### Allowance and Token Balance
 
-For vesting creation:
+For stream creation:
 
 1. **ERC-20 allowance.** Check `allowance(owner, lockup)`. The required allowance depends on mode:
-   - **Single Vesting:** `DEPOSIT_AMOUNT`
-   - **Batch of Vestings:** sum of `DEPOSIT_AMOUNT` across all vestings
-   If allowance is below the required total, send an `approve` transaction to raise allowance before attempting vesting creation.
-2. **ERC-20 token balance.** Check `balanceOf(owner)` is at least the total deposit amount (single deposit or the sum of all batch deposits). If balance is insufficient, stop execution and inform the user they need more tokens (for example, obtain or purchase via Uniswap) before continuing.
+   - **Single Stream:** `DEPOSIT_AMOUNT`
+   - **Batch of Streams:** sum of `DEPOSIT_AMOUNT` across all streams
+   If allowance is below the required total, send an `approve` transaction to raise allowance before attempting stream creation.
+2. **ERC-20 token balance.** Check `balanceOf(owner)` is at least the total deposit amount (single-stream deposit or the sum of all batch deposits). If balance is insufficient, stop execution and inform the user they need more tokens (for example, obtain or purchase via Uniswap) before continuing.
 
 ### Native Gas Balance for Every Transaction
 
-Before broadcasting each transaction, check that the sender has enough native gas token (ETH/POL/BNB/etc.) to cover both gas fees and the creation fee (`MSG_VALUE`). Run this check again before each broadcast (`approve` and vesting creation). If balance is insufficient, stop and tell the user to fund their wallet first. Recommend buying via [Transak](https://transak.com/buy).
+Before broadcasting each transaction, check that the sender has enough native gas token (ETH/POL/BNB/etc.) to cover both gas fees and the creation fee (`MSG_VALUE`). Run this check again before each broadcast (`approve` and stream creation). If balance is insufficient, stop and tell the user to fund their wallet first. Recommend buying via [Transak](https://transak.com/buy).
 
 ### Read-Only Validation Commands
 
@@ -191,9 +192,9 @@ OWNER=$(cast wallet address --browser)
 
 #### 2) Run preflight checks and handle `approve` if needed
 
-Run all checks from [Preflight Checks](#preflight-checks), calculate `MSG_VALUE` per the [Creation Fee](#creation-fee-msg_value) section, and re-run the native gas check before each broadcast (`approve` and vesting creation). If an ERC-20 `approve` transaction is needed, execute it before continuing to step 3.
+Run all checks from [Preflight Checks](#preflight-checks), calculate `MSG_VALUE` per the [Creation Fee](#creation-fee-msg_value) section, and re-run the native gas check before each broadcast (`approve` and stream creation). If an ERC-20 `approve` transaction is needed, execute it before continuing to step 3.
 
-### Single Vesting Flow
+### Single Stream Flow
 
 #### 3) Preview Transaction (No Broadcast)
 
@@ -241,19 +242,19 @@ cast receipt "$TX_HASH" --rpc-url "$RPC_URL"
 
 #### 7) Direct User to the Sablier App
 
-After successful confirmation, inform the user they can view and manage vestings at [app.sablier.com](https://app.sablier.com).
+After successful confirmation, inform the user they can view and manage streams at [app.sablier.com](https://app.sablier.com).
 
 ### Batch Flow
 
 #### 3) Encode Individual Create Calls
 
-For each vesting, ABI-encode the full `create*` calldata using `cast calldata`:
+For each stream, ABI-encode the full `create*` calldata using `cast calldata`:
 
 ```bash
-CALL_1=$(cast calldata "$FUNCTION_SIG" $ARGS_VESTING_1)
-CALL_2=$(cast calldata "$FUNCTION_SIG" $ARGS_VESTING_2)
-CALL_3=$(cast calldata "$FUNCTION_SIG" $ARGS_VESTING_3)
-# ... repeat for each vesting
+CALL_1=$(cast calldata "$FUNCTION_SIG" $ARGS_STREAM_1)
+CALL_2=$(cast calldata "$FUNCTION_SIG" $ARGS_STREAM_2)
+CALL_3=$(cast calldata "$FUNCTION_SIG" $ARGS_STREAM_3)
+# ... repeat for each stream
 ```
 
 Each `CALL_N` is a complete calldata blob (4-byte selector + ABI-encoded arguments).
@@ -264,12 +265,12 @@ Present a human-readable summary:
 
 - **Contract:** `$LOCKUP`
 - **Function:** `batch(bytes[])`
-- **Number of vestings**, each with: recipient, amount, shape, duration
+- **Number of streams**, each with: recipient, amount, shape, duration
 - **Creation fee:** ~$1 USD in native token (`MSG_VALUE`) for the entire batch
 
 #### 5) Require Explicit Confirmation
 
-Apply the same confirmation rule as Single Vesting: show transaction details and require explicit user confirmation before broadcast.
+Apply the same confirmation rule as Single Stream: show transaction details and require explicit user confirmation before broadcast.
 
 #### 6) Broadcast After Confirmation
 
@@ -293,7 +294,7 @@ cast receipt "$TX_HASH" --rpc-url "$RPC_URL"
 
 #### 8) Direct User to the Sablier App
 
-After successful confirmation, inform the user they can view and manage vestings at [app.sablier.com](https://app.sablier.com).
+After successful confirmation, inform the user they can view and manage streams at [app.sablier.com](https://app.sablier.com).
 
 ## Entrypoint Catalog
 
@@ -309,7 +310,7 @@ Maps each vesting shape to the correct `SablierLockup` function and calldata enc
 | Monthly Unlocks | `createWithDurationsLT` | `createWithTimestampsLT` | `"tranchedMonthly"` |
 | Timelock | `createWithDurationsLL` | `createWithTimestampsLL` | `"linearTimelock"` |
 
-Use `Durations` variants when the vesting should start immediately upon confirmation. Use `Timestamps` variants when the user provides specific start or unlock times.
+Use `Durations` variants when the stream should start immediately upon confirmation. Use `Timestamps` variants when the user provides specific start or unlock times.
 
 ### `createWithDurationsLL`
 
@@ -326,7 +327,7 @@ createWithDurationsLL(
 **Arguments:**
 
 1. **params** tuple - `(sender, recipient, depositAmount, token, cancelable, transferable, shape)`
-2. **unlockAmounts** tuple - `(start, cliff)` - amounts unlocked instantly at vesting start and at cliff time
+2. **unlockAmounts** tuple - `(start, cliff)` - amounts unlocked instantly at stream start and at cliff time
 3. **durations** tuple - `(cliff, total)` - durations in seconds
 
 **Shape-specific encoding:**
@@ -352,7 +353,7 @@ createWithTimestampsLL(
 **Arguments:**
 
 1. **params** tuple - `(sender, recipient, depositAmount, token, cancelable, transferable, (startTimestamp, endTimestamp), shape)`
-2. **unlockAmounts** tuple - `(start, cliff)` - amounts unlocked instantly at vesting start and at cliff time
+2. **unlockAmounts** tuple - `(start, cliff)` - amounts unlocked instantly at stream start and at cliff time
 3. **cliffTime** - Unix timestamp for the cliff; set to `0` if no cliff
 
 **Shape-specific encoding:**
@@ -411,7 +412,7 @@ createWithTimestampsLT(
 
 ### `batch`
 
-Used to create **multiple vestings in a single transaction**. Each element in the `calls` array is a fully ABI-encoded `create*` calldata.
+Used to create **multiple streams in a single transaction**. Each element in the `calls` array is a fully ABI-encoded `create*` calldata.
 
 ```
 batch(bytes[] calls)
@@ -423,9 +424,9 @@ batch(bytes[] calls)
 
 ## Worked Examples
 
-### Single Vesting: `createWithDurationsLL`
+### Single Stream: `createWithDurationsLL`
 
-A single cliff vesting of 1000 USDC (6 decimals) with a 90-day cliff and 365-day total duration on Ethereum mainnet:
+A single cliff stream of 1000 USDC (6 decimals) with a 90-day cliff and 365-day total duration on Ethereum mainnet:
 
 ```bash
 LOCKUP="<lockup-address>"    # From Supported Chains table
@@ -453,9 +454,9 @@ Notes:
 - `(7776000,31536000)` = 90-day cliff and 365-day total duration, both in seconds
 - `MSG_VALUE` = ~$1 USD worth of native token (see [Creation Fee](#creation-fee-msg_value))
 
-### Batch of Vestings: 3x `createWithDurationsLL`
+### Batch of Streams: 3x `createWithDurationsLL`
 
-A batch of three linear vestings of 1000 USDC each to different recipients, with a 365-day duration and no cliff, on Ethereum mainnet:
+A batch of three linear streams of 1000 USDC each to different recipients, with a 365-day duration and no cliff, on Ethereum mainnet:
 
 ```bash
 LOCKUP="<lockup-address>"    # From Supported Chains table
@@ -484,8 +485,8 @@ Notes:
 - ERC-20 approval must cover the total deposit: 3 × 1000000000 = 3000000000 (3000 USDC)
 - `linear` selects the Linear shape
 - `MSG_VALUE` = ~$1 USD worth of native token for the entire batch
-- All three vestings use the same `SablierLockup` contract and the same `batch()` entrypoint
-- For more than 50 vestings, route to `sablier-create-airdrop`
+- All three streams use the same `SablierLockup` contract and the same `batch()` entrypoint
+- For more than 50 streams, route to `sablier-create-airdrop`
 
 ## Supported Chains
 

@@ -16,7 +16,7 @@ Use this sequence for every state-changing operation:
 4. Require explicit user confirmation.
 5. Broadcast with `cast send`.
 6. Verify the receipt.
-7. Direct the user to [app.sablier.com](https://app.sablier.com).
+7. Direct the user to the stream on [app.sablier.com](https://app.sablier.com).
 
 If ERC-20 allowance is insufficient, execute an `approve` transaction first, then resume at step 2.
 
@@ -201,9 +201,13 @@ Run all checks from [Preflight Checks](#preflight-checks), calculate `MSG_VALUE`
 
 #### 3) Preview Transaction (No Broadcast)
 
-Build and display calldata so the user can review before signing:
+Simulate the transaction to capture the stream ID, then build and display calldata so the user can review before signing:
 
 ```bash
+# Simulate to get the stream ID (dry run, no broadcast)
+STREAM_ID=$(cast call "$LOCKUP" "$FUNCTION_SIG" $FUNCTION_ARGS \
+  --value "$MSG_VALUE" --rpc-url "$RPC_URL" --from "$OWNER" | cast to-dec)
+
 CALLDATA=$(cast calldata "$FUNCTION_SIG" $FUNCTION_ARGS)
 echo "Calldata: $CALLDATA"
 ```
@@ -212,6 +216,7 @@ Present a human-readable summary:
 
 - **Contract:** `$LOCKUP`
 - **Function:** chosen `create*` entrypoint
+- **Stream ID:** `$STREAM_ID`
 - **Recipient, token, amount, shape, duration/timestamps**
 - **Creation fee:** ~$1 USD in native token (`MSG_VALUE`)
 
@@ -243,9 +248,13 @@ If `--browser` fails at runtime, ask the user to provide a private key and retry
 cast receipt "$TX_HASH" --rpc-url "$RPC_URL"
 ```
 
-#### 7) Direct User to the Sablier App
+#### 7) Direct User to the Stream
 
-After successful confirmation, inform the user they can view and manage streams at [app.sablier.com](https://app.sablier.com).
+After successful receipt verification, present the direct link to the stream:
+
+```
+https://app.sablier.com/vesting/stream/$LOCKUP-$STREAM_ID
+```
 
 ### Batch Flow
 
@@ -297,7 +306,7 @@ cast receipt "$TX_HASH" --rpc-url "$RPC_URL"
 
 #### 8) Direct User to the Sablier App
 
-After successful confirmation, inform the user they can view and manage streams at [app.sablier.com](https://app.sablier.com).
+After successful receipt verification, direct the user to view and manage their streams at [app.sablier.com/vesting](https://app.sablier.com/vesting).
 
 ## Entrypoint Catalog
 

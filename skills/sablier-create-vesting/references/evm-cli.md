@@ -99,7 +99,11 @@ Infer the creation mode from the user's request:
 | "create a stream for Alice"             | **Single Stream**    |
 
 - If ambiguous, ask the user to clarify.
-- Batch requests exceeding **50 streams** are not supported by this skill. Direct the user to the [Sablier UI](https://app.sablier.com) instead.
+- For batch requests exceeding **50 streams**, route to `sablier-create-airdrop`. If this skill is unavailable, recommend installing it with:
+
+  ```bash
+  npx skills add sablier-labs/sablier-skills --skill sablier-create-airdrop
+  ```
 
 ### 2) Choose Shape
 
@@ -620,7 +624,7 @@ Notes:
 - `MSG_VALUE` = ~$1 USD worth of native token for the entire batch
 - All three streams use the same `SablierLockup` contract and the same `batch()` entrypoint
 - After confirmation, wait/poll up to 5 minutes for the confirmed receipt, then extract all `streamId` values and build one final link per stream as `https://app.sablier.com/vesting/stream/LK2-${CHAIN_ID}-${STREAM_ID}`
-- For more than 50 streams, direct the user to the [Sablier UI](https://app.sablier.com)
+- For more than 50 streams, route to `sablier-create-airdrop`
 
 ## Supported Chains
 

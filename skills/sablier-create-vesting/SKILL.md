@@ -2,7 +2,7 @@
 name: sablier-create-vesting
 disable-model-invocation: false
 user-invocable: true
-argument-hint: <chain_name> <token_address> <vesting_details>
+argument-hint: <chain_name> <vested_token_address> <vesting_details>
 description: This skill should be used when the user asks to create "token vesting", "token vesting streams", "onchain vesting", "Ethereum vesting", "EVM vesting", "Solana vesting", "ERC-20 vesting", "ERC20 vesting", "BEP-20 vesting", or "BEP20 vesting" with Sablier Lockup, wants to create vesting schedules for a token or tokens on Ethereum, EVM-compatible chains, BNB Chain, or Solana, needs an agent to run onchain vesting-creation transactions on their behalf.
 ---
 
@@ -19,7 +19,7 @@ This skill is a coordinator for vesting creation and execution routing.
 | Argument | Description |
 | --- | --- |
 | `chain_name` | EVM chain where to create the vesting |
-| `token_address` | ERC-20 token contract address to vest. Token symbols cannot be resolved to addresses — the user must provide the exact contract address. |
+| `vested_token_address` | ERC-20 token contract address to vest. Token symbols cannot be resolved to addresses — the user must provide the exact contract address. |
 | `vesting_details` | The kind of vesting schedule they want |
 
 ## Workflow

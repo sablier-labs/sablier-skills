@@ -120,7 +120,7 @@ Do not guess or silently apply defaults for the campaign type, recipient list, o
 
 ```
 1. CREATE    → Deploy campaign via factory
-2. FEE       → Send creation fee to Sablier treasury
+2. FEE       → Send creation fee to comptroller
 3. FUND      → Transfer tokens to the campaign contract
 4. CLAIMS    → Recipients claim with Merkle proofs (after campaignStartTime)
 5. CLAWBACK  → (optional) Admin recovers unclaimed tokens after expiration

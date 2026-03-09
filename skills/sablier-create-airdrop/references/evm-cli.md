@@ -15,7 +15,7 @@ Use this sequence for every campaign creation:
 3. Build and show a human-readable transaction preview (no broadcast).
 4. Require explicit user confirmation.
 5. Deploy the campaign via the factory with `cast send`.
-6. Send the creation fee to the Sablier treasury.
+6. Send the creation fee to the comptroller.
 7. Fund the campaign by transferring tokens to the deployed campaign address.
 8. Verify and direct the user to [app.sablier.com](https://app.sablier.com).
 
@@ -103,7 +103,6 @@ Each campaign type has a dedicated factory:
 | VCA | `SablierFactoryMerkleVCA` |
 
 Also look up:
-- **Sablier treasury address** — for the creation fee transfer
 - **SablierLockup address** — required by MerkleLL and MerkleLT campaigns (look up at [Lockup Deployments](https://docs.sablier.com/guides/lockup/deployments.md))
 
 If the requested chain is not listed, ask the user to provide the factory address.
@@ -116,7 +115,6 @@ Collect these before building any transaction:
 - sender wallet address (resolved via `cast wallet address --browser` or provided by the user)
 - signing method (`--browser` preferred, `--private-key` fallback)
 - factory contract address (from step 3)
-- Sablier treasury address (from step 3)
 - `merkleRoot` and `ipfsCID` (from step 2)
 - `token` address
 - `aggregateAmount` (total tokens to distribute, in token base units)
@@ -178,9 +176,19 @@ cast call "$TOKEN" "balanceOf(address)(uint256)" "$OWNER" --rpc-url "$RPC_URL"
 
 ## Creation Fee
 
-The creation fee is approximately **~$2 USD** worth of the chain's native asset. The factory functions are **not payable** — send the fee as a separate native token transfer to the Sablier treasury.
+The creation fee is approximately **~$2 USD** worth of the chain's native asset. The factory functions are **not payable** — send the fee as a separate native token transfer to the comptroller contract.
 
-**Procedure:**
+**Resolving the fee recipient:**
+
+The fee recipient is the comptroller contract. Query it from the factory:
+
+```bash
+COMPTROLLER=$(cast call "$FACTORY" "comptroller()(address)" --rpc-url "$RPC_URL")
+```
+
+This is the same address that receives claim-time fees from recipients.
+
+**Calculating the fee amount:**
 
 1. Look up the `CoinGecko ID` for the chain's native asset from the [Supported Chains](#supported-chains) table.
 2. Use the `coingecko-api` skill to fetch the current USD price of the native asset by its CoinGecko ID. If this skill is unavailable, recommend installing it with:
@@ -195,8 +203,6 @@ The creation fee is approximately **~$2 USD** worth of the chain's native asset.
    # "ether" here means the 18-decimal unit, not the ETH asset — all EVM native assets use 18 decimals
    FEE_AMOUNT=$(cast to-wei $(echo "scale=18; 2 / $PRICE" | bc) ether)
    ```
-
-4. Look up the Sablier treasury address at the [Airdrop Deployments page](https://docs.sablier.com/guides/airdrops/deployments.md).
 
 ## Execution Runbook
 
@@ -225,7 +231,7 @@ Present a human-readable summary of all three transactions:
 - **Vesting parameters** (for LL/LT/VCA)
 
 **Transaction 2 — Creation Fee:**
-- **To:** Sablier treasury
+- **To:** comptroller (`$COMPTROLLER`)
 - **Amount:** ~$2 USD in native token (`FEE_AMOUNT`)
 
 **Transaction 3 — Fund Campaign:**
@@ -264,7 +270,7 @@ If `--browser` fails at runtime, ask the user to provide a private key and retry
 ### 6) Send Creation Fee
 
 ```bash
-cast send "$TREASURY" \
+cast send "$COMPTROLLER" \
   --value "$FEE_AMOUNT" \
   --rpc-url "$RPC_URL" \
   --from "$OWNER" \
@@ -451,7 +457,7 @@ Deploy an instant airdrop of 10,000 USDC (6 decimals) to 50 recipients on Ethere
 ```bash
 FACTORY="<factory-merkle-instant-address>"   # From Airdrop Deployments page
 TOKEN="0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"  # USDC on Ethereum
-TREASURY="<treasury-address>"                # From Airdrop Deployments page
+COMPTROLLER=$(cast call "$FACTORY" "comptroller()(address)" --rpc-url "$RPC_URL")
 OWNER=$(cast wallet address --browser)
 
 # From Merkle API
@@ -477,7 +483,7 @@ cast send "$FACTORY" "$FUNCTION_SIG" \
   --browser
 
 # 2. Send creation fee
-cast send "$TREASURY" \
+cast send "$COMPTROLLER" \
   --value "$FEE_AMOUNT" \
   --rpc-url "$RPC_URL" \
   --from "$OWNER" \
@@ -498,7 +504,7 @@ Notes:
 
 ## Supported Chains
 
-Use this registry to resolve chain metadata, RPC endpoints, and native asset pricing. Look up factory and treasury addresses at the [Airdrop Deployments page](https://docs.sablier.com/guides/airdrops/deployments.md). Look up `SablierLockup` addresses (needed by MerkleLL and MerkleLT) at the [Lockup Deployments page](https://docs.sablier.com/guides/lockup/deployments.md).
+Use this registry to resolve chain metadata, RPC endpoints, and native asset pricing. Look up factory addresses at the [Airdrop Deployments page](https://docs.sablier.com/guides/airdrops/deployments.md). Look up `SablierLockup` addresses (needed by MerkleLL and MerkleLT) at the [Lockup Deployments page](https://docs.sablier.com/guides/lockup/deployments.md).
 
 | Chain | Chain ID | Native Asset | CoinGecko ID | RPC URL |
 | --- | --- | --- | --- | --- |

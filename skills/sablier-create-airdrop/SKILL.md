@@ -3,7 +3,7 @@ name: sablier-create-airdrop
 disable-model-invocation: false
 user-invocable: true
 argument-hint: <chain_name> <token_address> <airdrop_details>
-description: This skill should be used when the user asks to create "token airdrops", "Merkle airdrops", "Sablier airdrops", "airstreams", "vested airdrops", "claimable airdrops", "token claim campaigns", "ERC-20 airdrops", "ERC20 airdrops", "BEP-20 airdrops", or "BEP20 airdrops" with Sablier Merkle, wants to distribute tokens to many recipients on Ethereum or EVM-compatible chains using Merkle proofs, needs an agent to run onchain airdrop-campaign-creation transactions on their behalf.
+description: This skill should be used when the user asks to create "token airdrops", "Merkle airdrops", "instant airdrops", "Sablier airdrops", "airstreams", "vested airdrops", "claimable airdrops", "token claim campaigns", "ERC-20 airdrops", "ERC20 airdrops", "BEP-20 airdrops", or "BEP20 airdrops" with Sablier Merkle, wants to distribute tokens to many recipients on Ethereum or EVM-compatible chains using Merkle proofs, needs an agent to run onchain airdrop-campaign-creation transactions on their behalf.
 ---
 
 # Sablier Merkle Airdrop Creation
@@ -16,20 +16,20 @@ This skill is a coordinator for airdrop campaign creation and execution routing.
 
 ## Arguments
 
-| Argument | Description |
-| --- | --- |
-| `chain_name` | EVM chain where to create the airdrop campaign |
-| `token_address` | ERC-20 token contract address to distribute. Token symbols cannot be resolved to addresses — the user must provide the exact contract address. |
-| `airdrop_details` | Campaign type, recipient list, vesting schedule (if applicable) |
+| Argument          | Description                                                                                                                                    |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `chain_name`      | EVM chain where to create the airdrop campaign                                                                                                 |
+| `token_address`   | ERC-20 token contract address to distribute. Token symbols cannot be resolved to addresses — the user must provide the exact contract address. |
+| `airdrop_details` | Campaign type, recipient list, vesting schedule (if applicable)                                                                                |
 
 ## Campaign Types
 
-| Type | Code | Distribution Method |
-| --- | --- | --- |
-| Instant | MerkleInstant | Direct token transfer on claim |
-| Linear | MerkleLL | Creates a Lockup Linear stream per claim (vesting over time) |
-| Tranched | MerkleLT | Creates a Lockup Tranched stream per claim (discrete unlock steps) |
-| VCA | MerkleVCA | Linear unlock; early claimers forfeit unvested tokens |
+| Type     | Code          | Distribution Method                                                |
+| -------- | ------------- | ------------------------------------------------------------------ |
+| Instant  | MerkleInstant | Direct token transfer on claim                                     |
+| Linear   | MerkleLL      | Creates a Lockup Linear stream per claim (vesting over time)       |
+| Tranched | MerkleLT      | Creates a Lockup Tranched stream per claim (discrete unlock steps) |
+| VCA      | MerkleVCA     | Linear unlock; early claimers forfeit unvested tokens              |
 
 ### Choosing a Campaign Type
 
@@ -64,10 +64,10 @@ Stop and call out unsupported requests before selecting an execution path.
 
 Treat the following as unsupported by this skill and by Sablier Merkle:
 
-   - Distributing native tokens (ETH, BNB, AVAX, etc.). Only ERC-20 tokens can be airdropped.
-   - Solana airdrops. This skill covers EVM chains only.
-   - Launching tokens for users. Require the user to explicitly provide an existing token address as input.
-   - Resolving token symbols (e.g. "USDC") to contract addresses. If the user provides a symbol instead of an address, ask them to provide the exact ERC-20 contract address.
+- Distributing native tokens (ETH, BNB, AVAX, etc.). Only ERC-20 tokens can be airdropped.
+- Solana airdrops. This skill covers EVM chains only.
+- Launching tokens for users. Require the user to explicitly provide an existing token address as input.
+- Resolving token symbols (e.g. "USDC") to contract addresses. If the user provides a symbol instead of an address, ask them to provide the exact ERC-20 contract address.
 
 ### 3. Clarify airdrop details
 
@@ -103,10 +103,18 @@ Do not guess or silently apply defaults for the campaign type, recipient list, o
 2. If the request is any other integration type, inform the user this skill does not support non-onchain integrations and stop.
 3. Otherwise, follow the route below.
 
-| Intent | EVM | Solana |
-| --- | --- | --- |
-| Airdrop campaign creation on the user's behalf | Use [evm-cli.md](references/evm-cli.md) | Not supported by this skill. |
-| Onchain integration guidance | Use [evm-onchain.md](references/evm-onchain.md) | Not supported by this skill. |
+| Intent                                         | EVM                                             | Solana                       |
+| ---------------------------------------------- | ----------------------------------------------- | ---------------------------- |
+| Airdrop campaign creation on the user's behalf | Use [evm-cli.md](references/evm-cli.md)         | Not supported by this skill. |
+| Onchain integration guidance                   | Use [evm-onchain.md](references/evm-onchain.md) | Not supported by this skill. |
+
+## Important Notes
+
+**`aggregateAmount` is not enforced onchain.** The Merkle tree leaf amounts are what enforce correctness. If the campaign is funded with less than the true aggregate, later claims will fail. Always fund the campaign with at least the full aggregate amount.
+
+**Token amounts must be in the token's smallest unit.** For example, for an 18-decimal token, 1.0 token = `1000000000000000000`. For a 6-decimal token like USDC, 1.0 USDC = `1000000`.
+
+**`initialAdmin` can differ from the campaign creator.** The `initialAdmin` is the address authorized to clawback unclaimed tokens — it does not have to be the same address that deploys the campaign. If the user does not specify an admin, default to the sender address.
 
 ## Campaign Lifecycle
 

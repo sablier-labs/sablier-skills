@@ -400,6 +400,48 @@ createMerkleVCA(
 - `expiration >= vestingEndTime + 1 week`
 - `unlockPercentage <= 1e18`
 
+### Deterministic Addresses (`compute*`)
+
+Each factory exposes a `compute*` function to predict the campaign address before deployment. Use this to know the campaign address for funding without parsing event logs.
+
+**`computeMerkleInstant`:**
+
+```
+computeMerkleInstant(
+  address campaignCreator,
+  (string campaignName, uint40 campaignStartTime, uint40 expiration, address initialAdmin, string ipfsCID, bytes32 merkleRoot, address token)
+) → address
+```
+
+**`computeMerkleLL`:**
+
+```
+computeMerkleLL(
+  address campaignCreator,
+  (string campaignName, uint40 campaignStartTime, bool cancelable, uint40 cliffDuration, uint256 cliffUnlockPercentage, uint40 expiration, address initialAdmin, string ipfsCID, address lockup, bytes32 merkleRoot, string shape, uint256 startUnlockPercentage, address token, uint40 totalDuration, bool transferable, uint40 vestingStartTime)
+) → address
+```
+
+**`computeMerkleLT`:**
+
+```
+computeMerkleLT(
+  address campaignCreator,
+  (string campaignName, uint40 campaignStartTime, bool cancelable, uint40 expiration, address initialAdmin, string ipfsCID, address lockup, bytes32 merkleRoot, string shape, address token, (uint64 unlockPercentage, uint40 duration)[] tranchesWithPercentages, bool transferable, uint40 vestingStartTime)
+) → address
+```
+
+**`computeMerkleVCA`:**
+
+```
+computeMerkleVCA(
+  address campaignCreator,
+  (string campaignName, uint40 campaignStartTime, uint40 expiration, address initialAdmin, string ipfsCID, bytes32 merkleRoot, address token, uint256 unlockPercentage, uint40 vestingEndTime, uint40 vestingStartTime)
+) → address
+```
+
+The `campaignCreator` is the `msg.sender` of the `createMerkle*` call — use the sender's wallet address. The params tuple is identical to the one passed to the corresponding `createMerkle*` function.
+
 ## Worked Example
 
 ### Instant Campaign: `createMerkleInstant`

@@ -77,11 +77,7 @@ Infer the creation mode from the user's request:
 | "create a stream for Alice" | **Single Stream** |
 
 - If ambiguous, ask the user to clarify.
-- For batch requests exceeding **50 streams**, route to `sablier-create-airdrop`. If this skill is unavailable, recommend installing it with:
-
-  ```bash
-  npx skills add sablier-labs/sablier-skills --skill sablier-create-airdrop
-  ```
+- Batch requests exceeding **50 streams** are not supported by this skill. Direct the user to the [Sablier UI](https://app.sablier.com) instead.
 
 ### 2) Choose Function
 
@@ -162,19 +158,26 @@ The creation fee is approximately **~$1 USD** worth of the chain's native asset.
 
 **Procedure:**
 
-1. Look up the `CoinGecko ID` for the chain's native asset from the [Supported Chains](#supported-chains) table.
-2. Use the `coingecko-api` skill to fetch the current USD price of the native asset by its CoinGecko ID. If this skill is unavailable, recommend installing it with:
+Look up the `MSG_VALUE` for the chain's native asset from this table:
 
-   ```bash
-   npx skills add sablier-labs/agent-skills --skill coingecko-api
-   ```
+| Native Asset | ~Amount | MSG_VALUE (wei) |
+| --- | --- | --- |
+| ETH | 0.0005 ETH | `500000000000000` |
+| AVAX | 0.11 AVAX | `110000000000000000` |
+| BERA | 1.9 BERA | `1900000000000000000` |
+| BNB | 0.0016 BNB | `1600000000000000` |
+| CHZ | 25 CHZ | `25000000000000000000` |
+| CORE | 12.5 CORE | `12500000000000000000` |
+| HYPE | 0.032 HYPE | `32000000000000000` |
+| MON | 50 MON | `50000000000000000000` |
+| POL | 10 POL | `10000000000000000000` |
+| S | 25 S | `25000000000000000000` |
+| SEI | 14 SEI | `14000000000000000000` |
+| WATT | 0 WATT | `0` |
+| xDAI | 1 xDAI | `1000000000000000000` |
+| XDC | 29 XDC | `29000000000000000000` |
 
-3. Calculate MSG_VALUE as ~$1 USD worth of native asset in wei:
-
-   ```bash
-   # "ether" here means the 18-decimal unit, not the ETH asset — all EVM native assets use 18 decimals
-   MSG_VALUE=$(cast to-wei $(echo "scale=18; 1 / $PRICE" | bc) ether)
-   ```
+> These values are approximate as of March 2026. If a value seems outdated, use web search to find the current price and recalculate as `cast to-wei $(echo "scale=18; 1 / $PRICE" | bc) ether`.
 
 - Use the same fee for both **Single Stream** and **Batch of Streams** transactions.
 - Before sending, verify the wallet has enough native token for both `MSG_VALUE` and gas.
@@ -552,43 +555,41 @@ Notes:
 - `MSG_VALUE` = ~$1 USD worth of native token for the entire batch
 - All three streams use the same `SablierFlow` contract and the same `batch()` entrypoint
 - You can mix `create` and `createAndDeposit` calls in the same batch
-- For more than 50 streams, route to `sablier-create-airdrop`
+- For more than 50 streams, direct the user to the [Sablier UI](https://app.sablier.com)
 
 ## Supported Chains
 
-Use this registry to resolve chain metadata, RPC endpoints, native asset pricing, and `SablierFlow` contract addresses:
+Use this registry to resolve chain metadata, RPC endpoints, and `SablierFlow` contract addresses:
 
-| Chain | Chain ID | Native Asset | CoinGecko ID | SablierFlow | RPC URL |
-| --- | --- | --- | --- | --- | --- |
-| Ethereum | `1` | ETH | `ethereum` | `0x7a86d3e6894f9c5b5f25ffbdaae658cfc7569623` | `https://ethereum-rpc.publicnode.com` |
-| Abstract | `2741` | ETH | `ethereum` | `0xc415425e56cc6c42b87bacffb276db2292cc1e50` | `https://api.mainnet.abs.xyz` |
-| Arbitrum | `42161` | ETH | `ethereum` | `0xf0f6477422a346378458f73cf02f05a7492e0c25` | `https://arb1.arbitrum.io/rpc` |
-| Avalanche | `43114` | AVAX | `avalanche-2` | `0x64dc318ba879eca8222e963d319728f211c600c7` | `https://api.avax.network/ext/bc/C/rpc` |
-| Base | `8453` | ETH | `ethereum` | `0x8551208f75375abfaee1fbe0a69e390a94000ec2` | `https://mainnet.base.org` |
-| Berachain | `80094` | BERA | `berachain` | `0xb89cc68b2ef376ca1b9645f109f7a490b180cf1b` | `https://rpc.berachain.com` |
-| Blast | `81457` | ETH | `ethereum` | `0x13ce2ca4602d5d1dd323014cd5a4e8414d310a06` | `https://rpc.blast.io` |
-| BNB Chain | `56` | BNB | `binancecoin` | `0x5505c2397B0BeBEEE64919F21Df84F83C008C51b` | `https://bsc-dataseed1.bnbchain.org` |
-| Chiliz | `88888` | CHZ | `chiliz` | `0x21797da50e180d24d6a68e8be6f8daca1c06f0ee` | `https://rpc.chiliz.com` |
-| Core Dao | `1116` | CORE | `coredaoorg` | `0x4cb7fb49e4b646b472a5609804004722b3b94f93` | `https://rpc.coredao.org` |
-| Denergy | `369369` | WATT | — | `0xB2Fc49d89B72cD8Aadd7f07D602CF005D5A017Ea` | `https://rpc.d.energy` |
-| Gnosis | `100` | xDAI | `dai` | `0xcdd3eb5283e4a675f16ba83e9d8c28c871a550a2` | `https://rpc.gnosischain.com` |
-| HyperEVM | `999` | HYPE | `hyperliquid` | `0x70ce7795896c1e226C71360F9d77B743d8302182` | `https://rpc.hyperliquid.xyz/evm` |
-| Lightlink | `1890` | ETH | `ethereum` | `0x5f742f6becc61e76ae67b0dc29d58f5c964e2c78` | `https://replicator.phoenix.lightlink.io/rpc/v1` |
-| Linea Mainnet | `59144` | ETH | `ethereum` | `0x977FDf70abeD6b60eECcee85322beA4575B0b6Ed` | `https://rpc.linea.build` |
-| Mode | `34443` | ETH | `ethereum` | `0xbed2f163cc0aa3278261ef1c3fa51b98db270829` | `https://mainnet.mode.network` |
-| Monad | `143` | MON | `monad` | `0x0340a829b6dC3aDF7710a5bAF1970914af4977f5` | `https://rpc.monad.xyz` |
-| Morph | `2818` | ETH | `ethereum` | `0xbf407836021c993dfa27cb8232415d15faea709a` | `https://rpc.morphl2.io` |
-| OP Mainnet | `10` | ETH | `ethereum` | `0xd18491649440d6338532f260761cee64e79d7bb2` | `https://mainnet.optimism.io` |
-| Polygon | `137` | POL | `polygon` | `0x62b6d5a3ac0cc91ecebd019d1c70fe955d8c7426` | `https://polygon-bor-rpc.publicnode.com` |
-| Scroll | `534352` | ETH | `ethereum` | `0xc3e92b9714ed01b51fdc29bb88b17af5cddd2c22` | `https://rpc.scroll.io` |
-| Sei Network | `1329` | SEI | `sei` | `0x9eaf5a3f23964148a1321078f9cce4c2325c603e` | `https://evm-rpc.sei-apis.com` |
-| Sonic | `146` | S | `sonic` | `0x3954146884425accb86a6476dad69ec3591838cd` | `https://rpc.soniclabs.com` |
-| Superseed | `5330` | ETH | `ethereum` | `0xe91bbae6c7d67b7c5055de1c9635c17af056211b` | `https://mainnet.superseed.xyz` |
-| Unichain | `130` | ETH | `ethereum` | `0x170ecc032c96aa976fa702e94fbc9fa5bb64ee7c` | `https://mainnet.unichain.org` |
-| XDC | `50` | XDC | `xdc-network` | `0x3F00b8334EBE2A85875D1F8b50a43a12db67ACAD` | `https://rpc.xinfin.network` |
-| ZKsync Era | `324` | ETH | `ethereum` | `0xa7f02e692973b6315eaca7fb4285ad2536a89cd0` | `https://mainnet.era.zksync.io` |
-| Sepolia | `11155111` | ETH | `ethereum` | `0xde489096eC9C718358c52a8BBe4ffD74857356e9` | `https://ethereum-sepolia-rpc.publicnode.com` |
+| Chain | Chain ID | Native Asset | SablierFlow | RPC URL |
+| --- | --- | --- | --- | --- |
+| Ethereum | `1` | ETH | `0x7a86d3e6894f9c5b5f25ffbdaae658cfc7569623` | `https://ethereum-rpc.publicnode.com` |
+| Abstract | `2741` | ETH | `0xc415425e56cc6c42b87bacffb276db2292cc1e50` | `https://api.mainnet.abs.xyz` |
+| Arbitrum | `42161` | ETH | `0xf0f6477422a346378458f73cf02f05a7492e0c25` | `https://arb1.arbitrum.io/rpc` |
+| Avalanche | `43114` | AVAX | `0x64dc318ba879eca8222e963d319728f211c600c7` | `https://api.avax.network/ext/bc/C/rpc` |
+| Base | `8453` | ETH | `0x8551208f75375abfaee1fbe0a69e390a94000ec2` | `https://mainnet.base.org` |
+| Berachain | `80094` | BERA | `0xb89cc68b2ef376ca1b9645f109f7a490b180cf1b` | `https://rpc.berachain.com` |
+| Blast | `81457` | ETH | `0x13ce2ca4602d5d1dd323014cd5a4e8414d310a06` | `https://rpc.blast.io` |
+| BNB Chain | `56` | BNB | `0x5505c2397B0BeBEEE64919F21Df84F83C008C51b` | `https://bsc-dataseed1.bnbchain.org` |
+| Chiliz | `88888` | CHZ | `0x21797da50e180d24d6a68e8be6f8daca1c06f0ee` | `https://rpc.chiliz.com` |
+| Core Dao | `1116` | CORE | `0x4cb7fb49e4b646b472a5609804004722b3b94f93` | `https://rpc.coredao.org` |
+| Denergy | `369369` | WATT | `0xB2Fc49d89B72cD8Aadd7f07D602CF005D5A017Ea` | `https://rpc.d.energy` |
+| Gnosis | `100` | xDAI | `0xcdd3eb5283e4a675f16ba83e9d8c28c871a550a2` | `https://rpc.gnosischain.com` |
+| HyperEVM | `999` | HYPE | `0x70ce7795896c1e226C71360F9d77B743d8302182` | `https://rpc.hyperliquid.xyz/evm` |
+| Lightlink | `1890` | ETH | `0x5f742f6becc61e76ae67b0dc29d58f5c964e2c78` | `https://replicator.phoenix.lightlink.io/rpc/v1` |
+| Linea Mainnet | `59144` | ETH | `0x977FDf70abeD6b60eECcee85322beA4575B0b6Ed` | `https://rpc.linea.build` |
+| Mode | `34443` | ETH | `0xbed2f163cc0aa3278261ef1c3fa51b98db270829` | `https://mainnet.mode.network` |
+| Monad | `143` | MON | `0x0340a829b6dC3aDF7710a5bAF1970914af4977f5` | `https://rpc.monad.xyz` |
+| Morph | `2818` | ETH | `0xbf407836021c993dfa27cb8232415d15faea709a` | `https://rpc.morphl2.io` |
+| OP Mainnet | `10` | ETH | `0xd18491649440d6338532f260761cee64e79d7bb2` | `https://mainnet.optimism.io` |
+| Polygon | `137` | POL | `0x62b6d5a3ac0cc91ecebd019d1c70fe955d8c7426` | `https://polygon-bor-rpc.publicnode.com` |
+| Scroll | `534352` | ETH | `0xc3e92b9714ed01b51fdc29bb88b17af5cddd2c22` | `https://rpc.scroll.io` |
+| Sei Network | `1329` | SEI | `0x9eaf5a3f23964148a1321078f9cce4c2325c603e` | `https://evm-rpc.sei-apis.com` |
+| Sonic | `146` | S | `0x3954146884425accb86a6476dad69ec3591838cd` | `https://rpc.soniclabs.com` |
+| Superseed | `5330` | ETH | `0xe91bbae6c7d67b7c5055de1c9635c17af056211b` | `https://mainnet.superseed.xyz` |
+| Unichain | `130` | ETH | `0x170ecc032c96aa976fa702e94fbc9fa5bb64ee7c` | `https://mainnet.unichain.org` |
+| XDC | `50` | XDC | `0x3F00b8334EBE2A85875D1F8b50a43a12db67ACAD` | `https://rpc.xinfin.network` |
+| ZKsync Era | `324` | ETH | `0xa7f02e692973b6315eaca7fb4285ad2536a89cd0` | `https://mainnet.era.zksync.io` |
+| Sepolia | `11155111` | ETH | `0xde489096eC9C718358c52a8BBe4ffD74857356e9` | `https://ethereum-sepolia-rpc.publicnode.com` |
 
 Ethereum can also be referred to as "Mainnet".
-
-> **Note:** Denergy (WATT) is not listed on CoinGecko. Use web search to find the current price of WATT in USD.

@@ -190,19 +190,26 @@ This is the same address that receives claim-time fees from recipients.
 
 **Calculating the fee amount:**
 
-1. Look up the `CoinGecko ID` for the chain's native asset from the [Supported Chains](#supported-chains) table.
-2. Use the `coingecko-api` skill to fetch the current USD price of the native asset by its CoinGecko ID. If this skill is unavailable, recommend installing it with:
+Look up the `FEE_AMOUNT` for the chain's native asset from this table (~$2 USD):
 
-   ```bash
-   npx skills add sablier-labs/agent-skills --skill coingecko-api
-   ```
+| Native Asset | ~Amount | FEE_AMOUNT (wei) |
+| --- | --- | --- |
+| ETH | 0.001 ETH | `1000000000000000` |
+| AVAX | 0.22 AVAX | `220000000000000000` |
+| BERA | 3.8 BERA | `3800000000000000000` |
+| BNB | 0.0032 BNB | `3200000000000000` |
+| CHZ | 50 CHZ | `50000000000000000000` |
+| CORE | 25 CORE | `25000000000000000000` |
+| HYPE | 0.064 HYPE | `64000000000000000` |
+| MON | 100 MON | `100000000000000000000` |
+| POL | 20 POL | `20000000000000000000` |
+| S | 50 S | `50000000000000000000` |
+| SEI | 28 SEI | `28000000000000000000` |
+| WATT | 0 WATT | `0` |
+| xDAI | 2 xDAI | `2000000000000000000` |
+| XDC | 58 XDC | `58000000000000000000` |
 
-3. Calculate the fee amount in wei:
-
-   ```bash
-   # "ether" here means the 18-decimal unit, not the ETH asset — all EVM native assets use 18 decimals
-   FEE_AMOUNT=$(cast to-wei $(echo "scale=18; 2 / $PRICE" | bc) ether)
-   ```
+> These values are approximate as of March 2026. If a value seems outdated, use web search to find the current price and recalculate as `cast to-wei $(echo "scale=18; 2 / $PRICE" | bc) ether`.
 
 ## Execution Runbook
 
@@ -504,39 +511,37 @@ Notes:
 
 ## Supported Chains
 
-Use this registry to resolve chain metadata, RPC endpoints, and native asset pricing. Look up factory addresses at the [Airdrop Deployments page](https://docs.sablier.com/guides/airdrops/deployments.md). Look up `SablierLockup` addresses (needed by MerkleLL and MerkleLT) at the [Lockup Deployments page](https://docs.sablier.com/guides/lockup/deployments.md).
+Use this registry to resolve chain metadata and RPC endpoints. Look up factory addresses at the [Airdrop Deployments page](https://docs.sablier.com/guides/airdrops/deployments.md). Look up `SablierLockup` addresses (needed by MerkleLL and MerkleLT) at the [Lockup Deployments page](https://docs.sablier.com/guides/lockup/deployments.md).
 
-| Chain | Chain ID | Native Asset | CoinGecko ID | RPC URL |
-| --- | --- | --- | --- | --- |
-| Ethereum | `1` | ETH | `ethereum` | `https://ethereum-rpc.publicnode.com` |
-| Abstract | `2741` | ETH | `ethereum` | `https://api.mainnet.abs.xyz` |
-| Arbitrum | `42161` | ETH | `ethereum` | `https://arb1.arbitrum.io/rpc` |
-| Avalanche | `43114` | AVAX | `avalanche-2` | `https://api.avax.network/ext/bc/C/rpc` |
-| Base | `8453` | ETH | `ethereum` | `https://mainnet.base.org` |
-| Berachain | `80094` | BERA | `berachain` | `https://rpc.berachain.com` |
-| Blast | `81457` | ETH | `ethereum` | `https://rpc.blast.io` |
-| BNB Chain | `56` | BNB | `binancecoin` | `https://bsc-dataseed1.bnbchain.org` |
-| Chiliz | `88888` | CHZ | `chiliz` | `https://rpc.chiliz.com` |
-| Core Dao | `1116` | CORE | `coredaoorg` | `https://rpc.coredao.org` |
-| Denergy | `369369` | WATT | — | `https://rpc.d.energy` |
-| Gnosis | `100` | xDAI | `dai` | `https://rpc.gnosischain.com` |
-| HyperEVM | `999` | HYPE | `hyperliquid` | `https://rpc.hyperliquid.xyz/evm` |
-| Lightlink | `1890` | ETH | `ethereum` | `https://replicator.phoenix.lightlink.io/rpc/v1` |
-| Linea Mainnet | `59144` | ETH | `ethereum` | `https://rpc.linea.build` |
-| Mode | `34443` | ETH | `ethereum` | `https://mainnet.mode.network` |
-| Monad | `143` | MON | `monad` | `https://rpc.monad.xyz` |
-| Morph | `2818` | ETH | `ethereum` | `https://rpc.morphl2.io` |
-| OP Mainnet | `10` | ETH | `ethereum` | `https://mainnet.optimism.io` |
-| Polygon | `137` | POL | `polygon` | `https://polygon-bor-rpc.publicnode.com` |
-| Scroll | `534352` | ETH | `ethereum` | `https://rpc.scroll.io` |
-| Sei Network | `1329` | SEI | `sei` | `https://evm-rpc.sei-apis.com` |
-| Sonic | `146` | S | `sonic` | `https://rpc.soniclabs.com` |
-| Superseed | `5330` | ETH | `ethereum` | `https://mainnet.superseed.xyz` |
-| Unichain | `130` | ETH | `ethereum` | `https://mainnet.unichain.org` |
-| XDC | `50` | XDC | `xdc-network` | `https://rpc.xinfin.network` |
-| ZKsync Era | `324` | ETH | `ethereum` | `https://mainnet.era.zksync.io` |
-| Sepolia | `11155111` | ETH | `ethereum` | `https://ethereum-sepolia-rpc.publicnode.com` |
+| Chain | Chain ID | Native Asset | RPC URL |
+| --- | --- | --- | --- |
+| Ethereum | `1` | ETH | `https://ethereum-rpc.publicnode.com` |
+| Abstract | `2741` | ETH | `https://api.mainnet.abs.xyz` |
+| Arbitrum | `42161` | ETH | `https://arb1.arbitrum.io/rpc` |
+| Avalanche | `43114` | AVAX | `https://api.avax.network/ext/bc/C/rpc` |
+| Base | `8453` | ETH | `https://mainnet.base.org` |
+| Berachain | `80094` | BERA | `https://rpc.berachain.com` |
+| Blast | `81457` | ETH | `https://rpc.blast.io` |
+| BNB Chain | `56` | BNB | `https://bsc-dataseed1.bnbchain.org` |
+| Chiliz | `88888` | CHZ | `https://rpc.chiliz.com` |
+| Core Dao | `1116` | CORE | `https://rpc.coredao.org` |
+| Denergy | `369369` | WATT | `https://rpc.d.energy` |
+| Gnosis | `100` | xDAI | `https://rpc.gnosischain.com` |
+| HyperEVM | `999` | HYPE | `https://rpc.hyperliquid.xyz/evm` |
+| Lightlink | `1890` | ETH | `https://replicator.phoenix.lightlink.io/rpc/v1` |
+| Linea Mainnet | `59144` | ETH | `https://rpc.linea.build` |
+| Mode | `34443` | ETH | `https://mainnet.mode.network` |
+| Monad | `143` | MON | `https://rpc.monad.xyz` |
+| Morph | `2818` | ETH | `https://rpc.morphl2.io` |
+| OP Mainnet | `10` | ETH | `https://mainnet.optimism.io` |
+| Polygon | `137` | POL | `https://polygon-bor-rpc.publicnode.com` |
+| Scroll | `534352` | ETH | `https://rpc.scroll.io` |
+| Sei Network | `1329` | SEI | `https://evm-rpc.sei-apis.com` |
+| Sonic | `146` | S | `https://rpc.soniclabs.com` |
+| Superseed | `5330` | ETH | `https://mainnet.superseed.xyz` |
+| Unichain | `130` | ETH | `https://mainnet.unichain.org` |
+| XDC | `50` | XDC | `https://rpc.xinfin.network` |
+| ZKsync Era | `324` | ETH | `https://mainnet.era.zksync.io` |
+| Sepolia | `11155111` | ETH | `https://ethereum-sepolia-rpc.publicnode.com` |
 
 Ethereum can also be referred to as "Mainnet".
-
-> **Note:** Denergy (WATT) is not listed on CoinGecko. Use web search to find the current price of WATT in USD.

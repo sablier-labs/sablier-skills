@@ -77,11 +77,7 @@ Infer the creation mode from the user's request:
 | "create a stream for Alice" | **Single Stream** |
 
 - If ambiguous, ask the user to clarify.
-- For batch requests exceeding **50 streams**, route to `sablier-create-airdrop`. If this skill is unavailable, recommend installing it with:
-
-  ```bash
-  npx skills add sablier-labs/sablier-skills --skill sablier-create-airdrop
-  ```
+- Batch requests exceeding **50 streams** are not supported by this skill. Direct the user to the [Sablier UI](https://app.sablier.com) instead.
 
 ### 2) Choose Function
 
@@ -559,7 +555,7 @@ Notes:
 - `MSG_VALUE` = ~$1 USD worth of native token for the entire batch
 - All three streams use the same `SablierFlow` contract and the same `batch()` entrypoint
 - You can mix `create` and `createAndDeposit` calls in the same batch
-- For more than 50 streams, route to `sablier-create-airdrop`
+- For more than 50 streams, direct the user to the [Sablier UI](https://app.sablier.com)
 
 ## Supported Chains
 

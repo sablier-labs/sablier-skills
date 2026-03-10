@@ -234,11 +234,11 @@ Default preview rule: show only human-readable values in the user-facing preview
 
 #### 4) Require Explicit Confirmation
 
-Use a clear confirmation prompt, for example:
+Use a clear confirmation flow:
 
 - `Confirm broadcast? Reply exactly: YES`
 
-If the user does not explicitly confirm, stop.
+If the user does not explicitly confirm with `YES`, stop.
 
 #### 5) Broadcast After Confirmation
 

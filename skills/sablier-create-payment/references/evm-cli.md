@@ -54,7 +54,7 @@ Always use this sequence for state-changing transactions:
 
 1. Build a human-readable preview of the transaction parameters.
 2. Show the transaction details to the user.
-3. If the user explicitly requested an amount `"per month"`, show the [Calendar-Month Caveat for Explicit `"per month"` Requests](#calendar-month-caveat-for-explicit-per-month-requests) and require acknowledgment before continuing.
+3. If the user explicitly requested an amount `"per month"`, show the [Calendar-Month Caveat for Explicit `"per month"` Requests](#calendar-month-caveat-for-explicit-per-month-requests) immediately before the final confirmation prompt.
 4. Ask for explicit confirmation.
 5. Only after confirmation, run `cast send`.
 
@@ -68,12 +68,9 @@ If and only if the user explicitly requested an amount `"per month"`, show this 
 > Sablier Flow uses a fixed per-second streaming rate.
 > Exact "same amount every calendar month" streaming is not possible because calendar months have different numbers of seconds.
 > Your requested `"per month"` amount will be implemented using a **30-day month approximation** to calculate `ratePerSecond`.
->
-> Reply exactly: `I UNDERSTAND`
 
 - Do not show this caveat unless the user explicitly used `"per month"` in their request.
 - Do not show it for monthly wording introduced by the agent.
-- If the user does not explicitly acknowledge the caveat, stop.
 
 ## Intake & Planning Inputs
 
@@ -291,10 +288,10 @@ Default preview rule: show only human-readable values in the user-facing preview
 
 Use a clear confirmation flow:
 
-- If the Calendar-Month Caveat applies, show it first and require: `Reply exactly: I UNDERSTAND`
+- If the Calendar-Month Caveat applies, show it immediately before the final confirmation prompt.
 - Then ask: `Confirm broadcast? Reply exactly: YES`
 
-If the caveat applies and the user does not explicitly acknowledge it, stop. If the user does not explicitly confirm with `YES`, stop.
+If the user does not explicitly confirm with `YES`, stop.
 
 #### 5) Broadcast After Confirmation
 
@@ -374,7 +371,7 @@ Apply the same default preview rule: do not show `CALL_N` blobs, raw `ratePerSec
 
 #### 5) Require Explicit Confirmation
 
-Apply the same confirmation rule as Single Stream: show transaction details, show the Calendar-Month Caveat first if it applies, and require explicit user confirmation before broadcast.
+Apply the same confirmation rule as Single Stream: show transaction details, show the Calendar-Month Caveat immediately before the final confirmation prompt if it applies, and require explicit user confirmation before broadcast.
 
 #### 6) Broadcast After Confirmation
 

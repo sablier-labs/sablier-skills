@@ -62,7 +62,7 @@ Do not guess or silently apply defaults for the streaming rate, recipient, or up
 If the user explicitly requests a streaming amount `"per month"`:
 
 - Do not imply that Flow can deliver the exact same amount for each calendar month.
-- Before the final broadcast confirmation (`YES`), require a separate acknowledgment that Flow uses a fixed per-second rate, calendar months have unequal numbers of seconds, and exact calendar-month equality is not possible.
+- Before the final broadcast confirmation, show a caveat that Flow uses a fixed per-second rate, calendar months have unequal numbers of seconds, and exact calendar-month equality is not possible.
 - State that the requested `"per month"` amount will be implemented using a 30-day month approximation for the `ratePerSecond` calculation.
 - Only add this caveat when the user explicitly used `"per month"` in their request. Do not add it for other periods or for monthly wording introduced by the agent.
 
@@ -84,7 +84,7 @@ If the user explicitly requests a streaming amount `"per month"`:
    - Payment stream creation on the user's behalf
    - Onchain integration guidance
    - Any other integration type (frontend, backend, indexer, etc.)
-2. If the request is any other integration type, inform the user this skill does not support non-onchain integrations and stop.
+2. If the request is any other integration type, inform the user that this skill does not support non-onchain integrations and stop.
 3. Otherwise, follow the route below.
 
 | Intent                                       | EVM                                             | Solana                                   |

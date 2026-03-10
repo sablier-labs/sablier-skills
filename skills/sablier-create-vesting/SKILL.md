@@ -75,7 +75,7 @@ Do not guess or silently apply defaults for these parameters. Only proceed once 
    - Vesting creation on the user's behalf
    - Onchain integration guidance
    - Any other integration type (frontend, backend, indexer, etc.)
-2. If the request is any other integration type, inform the user this skill does not support non-onchain integrations and stop.
+2. If the request is any other integration type, inform the user that this skill does not support non-onchain integrations and stop.
 3. Otherwise, follow the route below.
 
 | Intent                                | EVM                                             | Solana                                                                                                                                                                  |

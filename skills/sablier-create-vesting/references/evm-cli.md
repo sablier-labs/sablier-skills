@@ -260,7 +260,14 @@ Default preview rule: show only human-readable values in the user-facing preview
 
 Use a clear confirmation flow:
 
-- `Confirm broadcast? Reply exactly: YES`
+⚠️ Final confirmation required
+
+```text
++------------------------------+
+| Confirm broadcast?           |
+| Reply exactly: YES           |
++------------------------------+
+```
 
 If the user does not explicitly confirm with `YES`, stop.
 
@@ -353,7 +360,7 @@ Apply the same default preview rule: do not show `CALL_N` blobs or token base-un
 
 #### 5) Require Explicit Confirmation
 
-Apply the same confirmation rule as Single Stream: show transaction details and require explicit user confirmation before broadcast.
+Apply the same confirmation rule as Single Stream: show transaction details, then show the same boxed `Reply exactly: YES` confirmation prompt before broadcast.
 
 #### 6) Broadcast After Confirmation
 

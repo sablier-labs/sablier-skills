@@ -313,7 +313,16 @@ Default preview rule: show only human-readable values in the user-facing preview
 Use a clear confirmation flow:
 
 - If the Calendar-Month Caveat applies, show it immediately before the final confirmation prompt.
-- Then ask: `Confirm broadcast? Reply exactly: YES`
+- Then show this final confirmation prompt:
+
+⚠️ Final confirmation required
+
+```text
++------------------------------+
+| Confirm broadcast?           |
+| Reply exactly: YES           |
++------------------------------+
+```
 
 If the user does not explicitly confirm with `YES`, stop.
 
@@ -407,7 +416,7 @@ Apply the same default preview rule: do not show `CALL_N` blobs, raw `ratePerSec
 
 #### 5) Require Explicit Confirmation
 
-Apply the same confirmation rule as Single Stream: show transaction details, show the Calendar-Month Caveat immediately before the final confirmation prompt if it applies, and require explicit user confirmation before broadcast.
+Apply the same confirmation rule as Single Stream: show transaction details, show the Calendar-Month Caveat immediately before the final confirmation prompt if it applies, then show the same boxed `Reply exactly: YES` confirmation prompt before broadcast.
 
 #### 6) Broadcast After Confirmation
 

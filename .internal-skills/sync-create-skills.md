@@ -20,8 +20,15 @@ Work only in these six files:
    - confirmation flow and stop/continue wording
    - preview-before-broadcast wording
    - shared `cast` guardrails and signing-method wording
+   - receipt wait timeout pattern and code block
    - generic routing wording such as execution intent, onchain integration intent, and non-onchain integration handling
    - shared user-facing phrasing that appears in matching workflow steps across all three skills
+   - supported chains parity: same chains, chain IDs, native assets, and RPC URLs across all three
+   - fee table parity: same set of native assets listed, same recalculation formula structure
+   - chain fallback wording: all should ask for both the RPC URL and the contract/factory address
+   - Transak recommendation URL and wording
+   - "Ethereum can also be referred to as Mainnet" note
+   - document section ordering: Overview → Execution Sequence → Mandatory Guardrails → Intake → Preflight → Execution Runbook → Entrypoint Catalog → Worked Examples → Supported Chains
 3. Treat these as out of scope unless multiple files already carry the same concept and only wording drifted:
    - product names, contract names, event names, URLs, slugs, and resource links
    - Flow rate calculation, the `"per month"` caveat, deposit semantics, and Flow-specific unsupported features
@@ -42,11 +49,18 @@ Work only in these six files:
 
 ## Verification
 
-After editing, run:
+After editing, fix any markdown formatting issues:
 
 ```bash
-just mdformat-check skills/sablier-create-open-ended-stream skills/sablier-create-vesting skills/sablier-create-airdrop
+just mdformat-write skills/sablier-create-open-ended-stream skills/sablier-create-vesting skills/sablier-create-airdrop
+```
+
+Then check for trailing whitespace and fix any issues found:
+
+```bash
 git diff --check -- skills/sablier-create-open-ended-stream/SKILL.md skills/sablier-create-open-ended-stream/references/evm-cli.md skills/sablier-create-vesting/SKILL.md skills/sablier-create-vesting/references/evm-cli.md skills/sablier-create-airdrop/SKILL.md skills/sablier-create-airdrop/references/evm-cli.md
 ```
+
+If any lines are flagged, remove the trailing whitespace from those lines.
 
 Re-read the touched sections and confirm that all three skills match on generic workflow language and still differ only where the products require it.

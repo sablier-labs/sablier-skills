@@ -37,7 +37,7 @@ if ! cast send --help 2>&1 | grep -q -- '--browser'; then
 fi
 ```
 
-If the check fails, stop and ask the user to install or upgrade Foundry at <https://getfoundry.sh/>.
+If the check fails, stop and ask the user to install or upgrade Foundry at [https://getfoundry.sh/](https://getfoundry.sh/).
 
 ### Signing Method (Mandatory)
 
@@ -99,6 +99,7 @@ Infer the creation mode from the user's request:
 | "create a stream for Alice"             | **Single Stream**    |
 
 - If ambiguous, ask the user to clarify.
+
 - For batch requests exceeding **50 streams**, route to `sablier-create-airdrop`. If this skill is unavailable, recommend installing it with:
 
   ```bash

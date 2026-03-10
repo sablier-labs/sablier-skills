@@ -17,6 +17,7 @@ address,amount
 ### Output
 
 The API returns:
+
 - `root` — the Merkle root (`bytes32`) for the campaign's `merkleRoot` parameter
 - `ipfsCID` — the IPFS CID where the full tree is stored, for the campaign's `ipfsCID` parameter
 - Eligibility endpoint — look up a recipient's index, amount, and proof for claiming

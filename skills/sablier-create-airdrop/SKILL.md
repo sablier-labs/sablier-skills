@@ -64,7 +64,7 @@ Stop and call out unsupported requests before selecting an execution path.
 
 Treat the following as unsupported by this skill and by Sablier Merkle:
 
-- Distributing native tokens (ETH, BNB, AVAX, etc.). Only ERC-20 tokens can be airdropped.
+- Distributing native tokens (ETH, BNB, AVAX, etc.). Only ERC-20 tokens can be airdropped. If the user wants to airdrop a native token, inform them they must wrap it first (e.g. WETH) and provide the wrapped token contract address.
 - Solana airdrops. This skill covers EVM chains only.
 - Launching tokens for users. Require the user to explicitly provide an existing token address as input.
 - Resolving token symbols (e.g. "USDC") to contract addresses. If the user provides a symbol instead of an address, ask them to provide the exact ERC-20 contract address.
@@ -79,6 +79,8 @@ If any of the following are missing or ambiguous from the user's input, use the 
 - Campaign start time (when claims open)
 - Expiration (when unclaimed tokens can be recovered; `0` for never — except VCA which requires expiration)
 - Vesting schedule (for LL: duration and cliff; for LT: tranche intervals; for VCA: vesting period)
+
+If the missing detail is the token address, use the `AskUserQuestion` tool to ask for the exact ERC-20 contract address and tell the user they can look it up on a blockchain explorer such as Etherscan.
 
 Do not guess or silently apply defaults for the campaign type, recipient list, or vesting schedule. Only proceed once all required inputs are confirmed.
 
@@ -100,7 +102,7 @@ Do not guess or silently apply defaults for the campaign type, recipient list, o
    - Airdrop campaign creation on the user's behalf
    - Onchain integration guidance
    - Any other integration type (frontend, backend, indexer, etc.)
-2. If the request is any other integration type, inform the user this skill does not support non-onchain integrations and stop.
+2. If the request is any other integration type, inform the user that this skill does not support non-onchain integrations and stop.
 3. Otherwise, follow the route below.
 
 | Intent                                         | EVM                                             | Solana                       |

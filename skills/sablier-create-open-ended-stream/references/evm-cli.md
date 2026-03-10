@@ -112,6 +112,7 @@ Infer the creation mode from the user's request:
 | "create a stream for Alice"             | **Single Stream**    |
 
 - If ambiguous, ask the user to clarify.
+
 - For batch requests exceeding **50 streams**, route to `sablier-create-airdrop`. If this skill is unavailable, recommend installing it with:
 
   ```bash
@@ -535,8 +536,8 @@ createAndDeposit(
 
 **Arguments:**
 
-1–6. Same as `create` above.
-7. **amount** — initial deposit in the token's base units (e.g. `1000000000` for 1000 USDC with 6 decimals). Must be > 0.
+- **1–6.** Same as `create` above.
+- **7. amount** — initial deposit in the token's base units (e.g. `1000000000` for 1000 USDC with 6 decimals). Must be > 0.
 
 ### `batch`
 

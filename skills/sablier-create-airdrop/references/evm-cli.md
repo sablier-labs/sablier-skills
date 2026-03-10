@@ -2,8 +2,6 @@
 
 ## Overview
 
-Use this reference when the user wants the agent to execute EVM transactions on their behalf, such as creating Sablier Merkle airdrop campaigns directly from the terminal.
-
 This guide is runbook-first: plan the campaign, generate the Merkle tree, run preflight checks, preview the transaction, require explicit confirmation, then deploy, pay the fee, fund, and verify.
 
 ## Execution Sequence
@@ -14,10 +12,10 @@ Use this sequence for every campaign creation:
 2. Run all [Preflight Checks](#preflight-checks), including token balance and native gas balance.
 3. Build and show a human-readable transaction preview (no broadcast).
 4. Require explicit user confirmation.
-5. Deploy the campaign via the factory with `cast send`.
-6. Send the creation fee to the comptroller.
-7. Fund the campaign by transferring tokens to the deployed campaign address.
-8. Verify and direct the user to [app.sablier.com](https://app.sablier.com).
+5. Deploy the campaign via the factory with `cast send`, wait/poll up to 5 minutes for the confirmed receipt.
+6. Send the creation fee to the comptroller, wait/poll up to 5 minutes for the confirmed receipt.
+7. Fund the campaign by transferring tokens to the deployed campaign address, wait/poll up to 5 minutes for the confirmed receipt.
+8. Direct the user to [app.sablier.com](https://app.sablier.com).
 
 ## Mandatory Guardrails
 
@@ -38,7 +36,7 @@ if ! cast send --help 2>&1 | grep -q -- '--browser'; then
 fi
 ```
 
-If the check fails, stop and ask the user to install or upgrade Foundry at <https://getfoundry.sh/>.
+If the check fails, stop and ask the user to install or upgrade Foundry at [https://getfoundry.sh/](https://getfoundry.sh/).
 
 ### Signing Method (Mandatory)
 
@@ -60,6 +58,30 @@ Always use this sequence for state-changing transactions:
 
 Never broadcast before explicit user confirmation.
 
+### Receipt Wait Timeout (Mandatory)
+
+For every broadcasted transaction (factory deploy, fee transfer, and token funding), wait/poll for a confirmed receipt for up to **5 minutes** before treating the transaction as failed or unconfirmed.
+
+Use this polling pattern for receipt verification:
+
+```bash
+RECEIPT=""
+START_TIME=$(date +%s)
+
+while true; do
+  RECEIPT=$(cast receipt "$TX_HASH" --rpc-url "$RPC_URL" --json 2>/dev/null) && break
+
+  if [ "$(($(date +%s) - START_TIME))" -ge 300 ]; then
+    echo "Timed out waiting for a confirmed receipt after 5 minutes: $TX_HASH"
+    exit 1
+  fi
+
+  sleep 5
+done
+```
+
+If the receipt is still unavailable after 5 minutes, stop, tell the user the transaction may still be pending, and share the transaction hash for manual follow-up.
+
 ## Intake & Planning Inputs
 
 Complete these steps in order before building calldata.
@@ -68,12 +90,12 @@ Complete these steps in order before building calldata.
 
 Use the [decision tree in SKILL.md](#choosing-a-campaign-type) to select the campaign type:
 
-| Signal | Campaign Type |
-| --- | --- |
-| "airdrop tokens immediately", "instant distribution" | **Instant** |
-| "airdrop with vesting", "linear vesting airdrop", "cliff + vesting" | **MerkleLL** |
-| "airdrop with monthly unlocks", "quarterly vesting", "step unlocks" | **MerkleLT** |
-| "early claimers forfeit", "variable claim", "incentivize waiting" | **MerkleVCA** |
+| Signal                                                              | Campaign Type |
+| ------------------------------------------------------------------- | ------------- |
+| "airdrop tokens immediately", "instant distribution"                | **Instant**   |
+| "airdrop with vesting", "linear vesting airdrop", "cliff + vesting" | **MerkleLL**  |
+| "airdrop with monthly unlocks", "quarterly vesting", "step unlocks" | **MerkleLT**  |
+| "early claimers forfeit", "variable claim", "incentivize waiting"   | **MerkleVCA** |
 
 - If ambiguous, ask the user to clarify using the decision tree.
 
@@ -95,17 +117,18 @@ Look up the factory contract address for the chosen campaign type and target cha
 
 Each campaign type has a dedicated factory:
 
-| Campaign Type | Factory Contract |
-| --- | --- |
-| Instant | `SablierFactoryMerkleInstant` |
-| Linear (LL) | `SablierFactoryMerkleLL` |
-| Tranched (LT) | `SablierFactoryMerkleLT` |
-| VCA | `SablierFactoryMerkleVCA` |
+| Campaign Type | Factory Contract              |
+| ------------- | ----------------------------- |
+| Instant       | `SablierFactoryMerkleInstant` |
+| Linear (LL)   | `SablierFactoryMerkleLL`      |
+| Tranched (LT) | `SablierFactoryMerkleLT`      |
+| VCA           | `SablierFactoryMerkleVCA`     |
 
 Also look up:
+
 - **SablierLockup address** — required by MerkleLL and MerkleLT campaigns (look up at [Lockup Deployments](https://docs.sablier.com/guides/lockup/deployments.md))
 
-If the requested chain is not listed, ask the user to provide the factory address.
+If the requested chain is not listed, ask the user to provide both the RPC URL and the factory address.
 
 ### 4) Collect Required Inputs
 
@@ -126,12 +149,12 @@ Collect these before building any transaction:
 
 **Type-specific inputs:**
 
-| Campaign Type | Additional Inputs |
-| --- | --- |
-| Instant | None |
-| MerkleLL | `lockup` address, `cancelable`, `transferable`, `shape`, `totalDuration`, `cliffDuration`, `cliffUnlockPercentage` (UD60x18), `startUnlockPercentage` (UD60x18), `vestingStartTime` |
-| MerkleLT | `lockup` address, `cancelable`, `transferable`, `shape`, `tranchesWithPercentages` array (each: `unlockPercentage` as UD2x18, `duration`), `vestingStartTime` |
-| MerkleVCA | `unlockPercentage` (UD60x18), `vestingStartTime`, `vestingEndTime` |
+| Campaign Type | Additional Inputs                                                                                                                                                                   |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Instant       | None                                                                                                                                                                                |
+| MerkleLL      | `lockup` address, `cancelable`, `transferable`, `shape`, `totalDuration`, `cliffDuration`, `cliffUnlockPercentage` (UD60x18), `startUnlockPercentage` (UD60x18), `vestingStartTime` |
+| MerkleLT      | `lockup` address, `cancelable`, `transferable`, `shape`, `tranchesWithPercentages` array (each: `unlockPercentage` as UD2x18, `duration`), `vestingStartTime`                       |
+| MerkleVCA     | `unlockPercentage` (UD60x18), `vestingStartTime`, `vestingEndTime`                                                                                                                  |
 
 ## Preflight Checks
 
@@ -192,22 +215,22 @@ This is the same address that receives claim-time fees from recipients.
 
 Look up the `FEE_AMOUNT` for the chain's native asset from this table (~$2 USD):
 
-| Native Asset | ~Amount | FEE_AMOUNT (wei) |
-| --- | --- | --- |
-| ETH | 0.001 ETH | `1000000000000000` |
-| AVAX | 0.22 AVAX | `220000000000000000` |
-| BERA | 3.8 BERA | `3800000000000000000` |
-| BNB | 0.0032 BNB | `3200000000000000` |
-| CHZ | 50 CHZ | `50000000000000000000` |
-| CORE | 25 CORE | `25000000000000000000` |
-| HYPE | 0.064 HYPE | `64000000000000000` |
-| MON | 100 MON | `100000000000000000000` |
-| POL | 20 POL | `20000000000000000000` |
-| S | 50 S | `50000000000000000000` |
-| SEI | 28 SEI | `28000000000000000000` |
-| WATT | 0 WATT | `0` |
-| xDAI | 2 xDAI | `2000000000000000000` |
-| XDC | 58 XDC | `58000000000000000000` |
+| Native Asset | ~Amount    | FEE_AMOUNT (wei)        |
+| ------------ | ---------- | ----------------------- |
+| ETH          | 0.001 ETH  | `1000000000000000`      |
+| AVAX         | 0.22 AVAX  | `220000000000000000`    |
+| BERA         | 3.8 BERA   | `3800000000000000000`   |
+| BNB          | 0.0032 BNB | `3200000000000000`      |
+| CHZ          | 50 CHZ     | `50000000000000000000`  |
+| CORE         | 25 CORE    | `25000000000000000000`  |
+| HYPE         | 0.064 HYPE | `64000000000000000`     |
+| MON          | 100 MON    | `100000000000000000000` |
+| POL          | 20 POL     | `20000000000000000000`  |
+| S            | 50 S       | `50000000000000000000`  |
+| SEI          | 28 SEI     | `28000000000000000000`  |
+| WATT         | 0 WATT     | `0`                     |
+| xDAI         | 2 xDAI     | `2000000000000000000`   |
+| XDC          | 58 XDC     | `58000000000000000000`  |
 
 > These values are approximate as of March 2026. If a value seems outdated, use web search to find the current price and recalculate as `cast to-wei $(echo "scale=18; 2 / $PRICE" | bc) ether`.
 
@@ -231,6 +254,7 @@ Run all checks from [Preflight Checks](#preflight-checks). Calculate `FEE_AMOUNT
 Present a human-readable summary of all three transactions:
 
 **Transaction 1 — Deploy Campaign:**
+
 - **Contract:** `$FACTORY`
 - **Function:** `createMerkle*` (type-specific)
 - **Campaign name, type, token, start time, expiration**
@@ -238,10 +262,12 @@ Present a human-readable summary of all three transactions:
 - **Vesting parameters** (for LL/LT/VCA)
 
 **Transaction 2 — Creation Fee:**
+
 - **To:** comptroller (`$COMPTROLLER`)
 - **Amount:** ~$2 USD in native token (`FEE_AMOUNT`)
 
 **Transaction 3 — Fund Campaign:**
+
 - **Contract:** `$TOKEN`
 - **Function:** `transfer(address,uint256)`
 - **To:** deployed campaign address
@@ -249,11 +275,18 @@ Present a human-readable summary of all three transactions:
 
 ### 4) Require Explicit Confirmation
 
-Use a clear confirmation prompt, for example:
+Use a clear confirmation flow:
 
-- `Confirm broadcast of all 3 transactions? Reply exactly: YES`
+⚠️ Final confirmation required
 
-If the user does not explicitly confirm, stop.
+```text
++------------------------------+
+| Confirm broadcast?           |
+| Reply exactly: YES           |
++------------------------------+
+```
+
+If the user does not explicitly confirm with `YES`, stop.
 
 ### 5) Deploy Campaign
 
@@ -266,44 +299,47 @@ CAMPAIGN=$(cast call "$FACTORY" "$COMPUTE_SIG" $COMPUTE_ARGS --rpc-url "$RPC_URL
 Then deploy. A browser tab will open for the user to approve the transaction in their wallet extension.
 
 ```bash
-cast send "$FACTORY" "$FUNCTION_SIG" $FUNCTION_ARGS \
+TX_HASH=$(cast send "$FACTORY" "$FUNCTION_SIG" $FUNCTION_ARGS \
   --rpc-url "$RPC_URL" \
   --from "$OWNER" \
-  --browser
+  --browser \
+  --async)
 ```
 
-If `--browser` fails at runtime, ask the user to provide a private key and retry with `--private-key`.
+Wait/poll up to 5 minutes for the confirmed receipt per [Receipt Wait Timeout (Mandatory)](#receipt-wait-timeout-mandatory) before proceeding.
+
+If `--browser` fails at runtime, ask the user to provide a private key and retry with `--private-key`. The same fallback applies to all transactions below.
 
 ### 6) Send Creation Fee
 
 ```bash
-cast send "$COMPTROLLER" \
+TX_HASH=$(cast send "$COMPTROLLER" \
   --value "$FEE_AMOUNT" \
   --rpc-url "$RPC_URL" \
   --from "$OWNER" \
-  --browser
+  --browser \
+  --async)
 ```
+
+Wait/poll up to 5 minutes for the confirmed receipt before proceeding.
 
 ### 7) Fund the Campaign
 
 Transfer the aggregate token amount to the deployed campaign address:
 
 ```bash
-cast send "$TOKEN" "transfer(address,uint256)" "$CAMPAIGN" "$AGGREGATE_AMOUNT" \
+TX_HASH=$(cast send "$TOKEN" "transfer(address,uint256)" "$CAMPAIGN" "$AGGREGATE_AMOUNT" \
   --rpc-url "$RPC_URL" \
   --from "$OWNER" \
-  --browser
+  --browser \
+  --async)
 ```
 
-### 8) Verify and Direct User to the Sablier App
+Wait/poll up to 5 minutes for the confirmed receipt.
 
-Verify the campaign deployment receipt:
+### 8) Direct User to the Sablier App
 
-```bash
-cast receipt "$TX_HASH" --rpc-url "$RPC_URL"
-```
-
-After successful deployment and funding, inform the user they can view and manage the campaign at [app.sablier.com](https://app.sablier.com).
+After all three transactions are confirmed, inform the user they can view and manage the campaign at [app.sablier.com](https://app.sablier.com).
 
 ## Entrypoint Catalog
 
@@ -457,12 +493,15 @@ The `campaignCreator` is the `msg.sender` of the `createMerkle*` call — use th
 
 ## Worked Example
 
+These examples intentionally use raw integers and ABI-ready arguments because they are for command construction. Do not copy these machine values into the default transaction preview; show human-readable token amounts first, and provide exact machine values separately only if the user explicitly asks.
+
 ### Instant Campaign: `createMerkleInstant`
 
 Deploy an instant airdrop of 10,000 USDC (6 decimals) to 50 recipients on Ethereum mainnet:
 
 ```bash
 FACTORY="<factory-merkle-instant-address>"   # From Airdrop Deployments page
+RPC_URL="<resolved-or-user-provided-rpc>"
 TOKEN="0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"  # USDC on Ethereum
 COMPTROLLER=$(cast call "$FACTORY" "comptroller()(address)" --rpc-url "$RPC_URL")
 OWNER=$(cast wallet address --browser)
@@ -480,27 +519,40 @@ START_TIME=$(echo "$(date +%s) + 86400" | bc)
 
 # Calculate FEE_AMOUNT per the "Creation Fee" section (~$2 USD)
 
+# Predict campaign address via compute function
+COMPUTE_SIG="computeMerkleInstant(address,(string,uint40,uint40,address,string,bytes32,address))"
+CAMPAIGN=$(cast call "$FACTORY" "$COMPUTE_SIG" \
+  "$OWNER" \
+  "(\"My Airdrop\",$START_TIME,0,$OWNER,\"$IPFS_CID\",$MERKLE_ROOT,$TOKEN)" \
+  --rpc-url "$RPC_URL")
+
 # 1. Deploy campaign
 FUNCTION_SIG="createMerkleInstant((string,uint40,uint40,address,string,bytes32,address),uint256,uint256)"
-cast send "$FACTORY" "$FUNCTION_SIG" \
+TX_HASH=$(cast send "$FACTORY" "$FUNCTION_SIG" \
   "(\"My Airdrop\",$START_TIME,0,$OWNER,\"$IPFS_CID\",$MERKLE_ROOT,$TOKEN)" \
   "$AGGREGATE_AMOUNT" "$RECIPIENT_COUNT" \
   --rpc-url "$RPC_URL" \
   --from "$OWNER" \
-  --browser
+  --browser \
+  --async)
+# Wait/poll up to 5 minutes for confirmed receipt
 
 # 2. Send creation fee
-cast send "$COMPTROLLER" \
+TX_HASH=$(cast send "$COMPTROLLER" \
   --value "$FEE_AMOUNT" \
   --rpc-url "$RPC_URL" \
   --from "$OWNER" \
-  --browser
+  --browser \
+  --async)
+# Wait/poll up to 5 minutes for confirmed receipt
 
-# 3. Fund campaign (predict address first with computeMerkleInstant, or parse from tx logs)
-cast send "$TOKEN" "transfer(address,uint256)" "$CAMPAIGN" "$AGGREGATE_AMOUNT" \
+# 3. Fund campaign
+TX_HASH=$(cast send "$TOKEN" "transfer(address,uint256)" "$CAMPAIGN" "$AGGREGATE_AMOUNT" \
   --rpc-url "$RPC_URL" \
   --from "$OWNER" \
-  --browser
+  --browser \
+  --async)
+# Wait/poll up to 5 minutes for confirmed receipt
 ```
 
 Notes:
@@ -508,40 +560,41 @@ Notes:
 - `aggregateAmount` is informational — the Merkle tree leaf amounts enforce correctness
 - Fund the campaign before `campaignStartTime` so claims don't fail
 - `FEE_AMOUNT` = ~$2 USD worth of native token (see [Creation Fee](#creation-fee))
+- `MSG_VALUE` is not used — factory functions are not payable; the fee is a separate native transfer
 
 ## Supported Chains
 
 Use this registry to resolve chain metadata and RPC endpoints. Look up factory addresses at the [Airdrop Deployments page](https://docs.sablier.com/guides/airdrops/deployments.md). Look up `SablierLockup` addresses (needed by MerkleLL and MerkleLT) at the [Lockup Deployments page](https://docs.sablier.com/guides/lockup/deployments.md).
 
-| Chain | Chain ID | Native Asset | RPC URL |
-| --- | --- | --- | --- |
-| Ethereum | `1` | ETH | `https://ethereum-rpc.publicnode.com` |
-| Abstract | `2741` | ETH | `https://api.mainnet.abs.xyz` |
-| Arbitrum | `42161` | ETH | `https://arb1.arbitrum.io/rpc` |
-| Avalanche | `43114` | AVAX | `https://api.avax.network/ext/bc/C/rpc` |
-| Base | `8453` | ETH | `https://mainnet.base.org` |
-| Berachain | `80094` | BERA | `https://rpc.berachain.com` |
-| Blast | `81457` | ETH | `https://rpc.blast.io` |
-| BNB Chain | `56` | BNB | `https://bsc-dataseed1.bnbchain.org` |
-| Chiliz | `88888` | CHZ | `https://rpc.chiliz.com` |
-| Core Dao | `1116` | CORE | `https://rpc.coredao.org` |
-| Denergy | `369369` | WATT | `https://rpc.d.energy` |
-| Gnosis | `100` | xDAI | `https://rpc.gnosischain.com` |
-| HyperEVM | `999` | HYPE | `https://rpc.hyperliquid.xyz/evm` |
-| Lightlink | `1890` | ETH | `https://replicator.phoenix.lightlink.io/rpc/v1` |
-| Linea Mainnet | `59144` | ETH | `https://rpc.linea.build` |
-| Mode | `34443` | ETH | `https://mainnet.mode.network` |
-| Monad | `143` | MON | `https://rpc.monad.xyz` |
-| Morph | `2818` | ETH | `https://rpc.morphl2.io` |
-| OP Mainnet | `10` | ETH | `https://mainnet.optimism.io` |
-| Polygon | `137` | POL | `https://polygon-bor-rpc.publicnode.com` |
-| Scroll | `534352` | ETH | `https://rpc.scroll.io` |
-| Sei Network | `1329` | SEI | `https://evm-rpc.sei-apis.com` |
-| Sonic | `146` | S | `https://rpc.soniclabs.com` |
-| Superseed | `5330` | ETH | `https://mainnet.superseed.xyz` |
-| Unichain | `130` | ETH | `https://mainnet.unichain.org` |
-| XDC | `50` | XDC | `https://rpc.xinfin.network` |
-| ZKsync Era | `324` | ETH | `https://mainnet.era.zksync.io` |
-| Sepolia | `11155111` | ETH | `https://ethereum-sepolia-rpc.publicnode.com` |
+| Chain         | Chain ID   | Native Asset | RPC URL                                          |
+| ------------- | ---------- | ------------ | ------------------------------------------------ |
+| Ethereum      | `1`        | ETH          | `https://ethereum-rpc.publicnode.com`            |
+| Abstract      | `2741`     | ETH          | `https://api.mainnet.abs.xyz`                    |
+| Arbitrum      | `42161`    | ETH          | `https://arb1.arbitrum.io/rpc`                   |
+| Avalanche     | `43114`    | AVAX         | `https://api.avax.network/ext/bc/C/rpc`          |
+| Base          | `8453`     | ETH          | `https://mainnet.base.org`                       |
+| Berachain     | `80094`    | BERA         | `https://rpc.berachain.com`                      |
+| Blast         | `81457`    | ETH          | `https://rpc.blast.io`                           |
+| BNB Chain     | `56`       | BNB          | `https://bsc-dataseed1.bnbchain.org`             |
+| Chiliz        | `88888`    | CHZ          | `https://rpc.chiliz.com`                         |
+| Core Dao      | `1116`     | CORE         | `https://rpc.coredao.org`                        |
+| Denergy       | `369369`   | WATT         | `https://rpc.d.energy`                           |
+| Gnosis        | `100`      | xDAI         | `https://rpc.gnosischain.com`                    |
+| HyperEVM      | `999`      | HYPE         | `https://rpc.hyperliquid.xyz/evm`                |
+| Lightlink     | `1890`     | ETH          | `https://replicator.phoenix.lightlink.io/rpc/v1` |
+| Linea Mainnet | `59144`    | ETH          | `https://rpc.linea.build`                        |
+| Mode          | `34443`    | ETH          | `https://mainnet.mode.network`                   |
+| Monad         | `143`      | MON          | `https://rpc.monad.xyz`                          |
+| Morph         | `2818`     | ETH          | `https://rpc.morphl2.io`                         |
+| OP Mainnet    | `10`       | ETH          | `https://mainnet.optimism.io`                    |
+| Polygon       | `137`      | POL          | `https://polygon-bor-rpc.publicnode.com`         |
+| Scroll        | `534352`   | ETH          | `https://rpc.scroll.io`                          |
+| Sei Network   | `1329`     | SEI          | `https://evm-rpc.sei-apis.com`                   |
+| Sonic         | `146`      | S            | `https://rpc.soniclabs.com`                      |
+| Superseed     | `5330`     | ETH          | `https://mainnet.superseed.xyz`                  |
+| Unichain      | `130`      | ETH          | `https://mainnet.unichain.org`                   |
+| XDC           | `50`       | XDC          | `https://rpc.xinfin.network`                     |
+| ZKsync Era    | `324`      | ETH          | `https://mainnet.era.zksync.io`                  |
+| Sepolia       | `11155111` | ETH          | `https://ethereum-sepolia-rpc.publicnode.com`    |
 
 Ethereum can also be referred to as "Mainnet".

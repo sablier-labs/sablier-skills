@@ -13,8 +13,8 @@ Use this sequence for every state-changing operation:
 3. Build and show a human-readable transaction preview (no broadcast).
 4. Require explicit user confirmation.
 5. Broadcast with `cast send`.
-6. Verify the receipt.
-7. Direct the user to [app.sablier.com](https://app.sablier.com).
+6. Verify the receipt and derive the created stream ID or IDs from `CreateFlowStream` logs.
+7. If the chain is supported in the Sablier UI, direct the user to the stream page on [app.sablier.com](https://app.sablier.com). Otherwise, present the receipt summary and explorer link.
 
 If ERC-20 allowance is insufficient (for `createAndDeposit`), execute an `approve` transaction first, then resume at step 2.
 
@@ -37,7 +37,7 @@ if ! cast send --help 2>&1 | grep -q -- '--browser'; then
 fi
 ```
 
-If the check fails, stop and ask the user to install or upgrade Foundry at <https://getfoundry.sh/>.
+If the check fails, stop and ask the user to install or upgrade Foundry at [https://getfoundry.sh/](https://getfoundry.sh/).
 
 ### Signing Method (Mandatory)
 
@@ -83,12 +83,14 @@ Choose the transaction parameters in this order before building calldata.
 
 Infer the creation mode from the user's request:
 
-| Signal | Mode |
-| --- | --- |
-| One recipient, one stream | **Single Stream** |
+
+| Signal                                  | Mode                 |
+| --------------------------------------- | -------------------- |
+| One recipient, one stream               | **Single Stream**    |
 | Multiple recipients or multiple streams | **Batch of Streams** |
-| "create streams for 5 recipients" | **Batch of Streams** |
-| "create a stream for Alice" | **Single Stream** |
+| "create streams for 5 recipients"       | **Batch of Streams** |
+| "create a stream for Alice"             | **Single Stream**    |
+
 
 - If ambiguous, ask the user to clarify.
 - Batch requests exceeding **50 streams** are not supported by this skill. Direct the user to the [Sablier UI](https://app.sablier.com) instead.
@@ -97,10 +99,12 @@ Infer the creation mode from the user's request:
 
 Infer whether to fund the stream upfront:
 
-| Signal | Function |
-| --- | --- |
-| "create a stream", "start streaming", no mention of deposit | **`create`** — stream starts with zero balance |
-| "create and deposit", "fund the stream", "deposit tokens", mentions an amount to deposit | **`createAndDeposit`** — stream is funded immediately |
+
+| Signal                                                                                   | Function                                              |
+| ---------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| "create a stream", "start streaming", no mention of deposit                              | `**create`** — stream starts with zero balance        |
+| "create and deposit", "fund the stream", "deposit tokens", mentions an amount to deposit | `**createAndDeposit**` — stream is funded immediately |
+
 
 - If the user wants to deposit tokens upfront but hasn't specified an amount, ask them to provide the deposit amount.
 - If ambiguous, ask the user whether they want to fund the stream at creation or deposit later.
@@ -117,13 +121,15 @@ ratePerSecond = (tokensPerPeriod * 1e18) / secondsInPeriod
 
 **Common period conversions:**
 
-| Period | Seconds |
-| --- | --- |
-| Per hour | `3600` |
-| Per day | `86400` |
-| Per week | `604800` |
-| Per 30-day month | `2592000` |
+
+| Period           | Seconds    |
+| ---------------- | ---------- |
+| Per hour         | `3600`     |
+| Per day          | `86400`    |
+| Per week         | `604800`   |
+| Per 30-day month | `2592000`  |
 | Per 365-day year | `31536000` |
+
 
 **Example:** Stream 1,000 USDC per 30-day month:
 
@@ -174,22 +180,24 @@ The creation fee is approximately **~$1 USD** worth of the chain's native asset.
 
 Look up the `MSG_VALUE` for the chain's native asset from this table:
 
-| Native Asset | ~Amount | MSG_VALUE (wei) |
-| --- | --- | --- |
-| ETH | 0.0005 ETH | `500000000000000` |
-| AVAX | 0.11 AVAX | `110000000000000000` |
-| BERA | 1.9 BERA | `1900000000000000000` |
-| BNB | 0.0016 BNB | `1600000000000000` |
-| CHZ | 25 CHZ | `25000000000000000000` |
-| CORE | 12.5 CORE | `12500000000000000000` |
-| HYPE | 0.032 HYPE | `32000000000000000` |
-| MON | 50 MON | `50000000000000000000` |
-| POL | 10 POL | `10000000000000000000` |
-| S | 25 S | `25000000000000000000` |
-| SEI | 14 SEI | `14000000000000000000` |
-| WATT | 0 WATT | `0` |
-| xDAI | 1 xDAI | `1000000000000000000` |
-| XDC | 29 XDC | `29000000000000000000` |
+
+| Native Asset | ~Amount    | MSG_VALUE (wei)        |
+| ------------ | ---------- | ---------------------- |
+| ETH          | 0.0005 ETH | `500000000000000`      |
+| AVAX         | 0.11 AVAX  | `110000000000000000`   |
+| BERA         | 1.9 BERA   | `1900000000000000000`  |
+| BNB          | 0.0016 BNB | `1600000000000000`     |
+| CHZ          | 25 CHZ     | `25000000000000000000` |
+| CORE         | 12.5 CORE  | `12500000000000000000` |
+| HYPE         | 0.032 HYPE | `32000000000000000`    |
+| MON          | 50 MON     | `50000000000000000000` |
+| POL          | 10 POL     | `10000000000000000000` |
+| S            | 25 S       | `25000000000000000000` |
+| SEI          | 14 SEI     | `14000000000000000000` |
+| WATT         | 0 WATT     | `0`                    |
+| xDAI         | 1 xDAI     | `1000000000000000000`  |
+| XDC          | 29 XDC     | `29000000000000000000` |
+
 
 > These values are approximate as of March 2026. If a value seems outdated, use web search to find the current price and recalculate as `cast to-wei $(echo "scale=18; 1 / $PRICE" | bc) ether`.
 
@@ -201,8 +209,8 @@ Look up the `MSG_VALUE` for the chain's native asset from this table:
 For `createAndDeposit` only:
 
 1. **ERC-20 allowance.** Check `allowance(owner, flow)`. The required allowance depends on mode:
-   - **Single Stream:** `DEPOSIT_AMOUNT`
-   - **Batch of Streams:** sum of `DEPOSIT_AMOUNT` across all streams
+  - **Single Stream:** `DEPOSIT_AMOUNT`
+  - **Batch of Streams:** sum of `DEPOSIT_AMOUNT` across all streams
    If allowance is below the required total, send an `approve` transaction to raise allowance before attempting stream creation.
 2. **ERC-20 token balance.** Check `balanceOf(owner)` is at least the total deposit amount. If balance is insufficient, stop execution and inform the user they need more tokens (for example, purchase via Uniswap) before continuing.
 
@@ -253,6 +261,7 @@ cast call "$TOKEN" "allowance(address,address)(uint256)" "$OWNER" "$FLOW" --rpc-
 #### 1) Resolve RPC URL, signing method, and sender address
 
 ```bash
+CHAIN_ID="<resolved-chain-id>"
 RPC_URL="<resolved-or-user-provided-rpc>"
 
 # Resolve sender address from browser wallet (opens a browser tab for the user to connect)
@@ -267,13 +276,9 @@ Run all checks from [Preflight Checks](#preflight-checks), calculate `MSG_VALUE`
 
 #### 3) Preview Transaction (No Broadcast)
 
-Simulate the transaction to capture the stream ID, then build and display calldata so the user can review before signing:
+Build and display calldata so the user can review the exact transaction before signing:
 
 ```bash
-# Simulate to get the stream ID (dry run, no broadcast)
-STREAM_ID=$(cast call "$FLOW" "$FUNCTION_SIG" $FUNCTION_ARGS \
-  --value "$MSG_VALUE" --rpc-url "$RPC_URL" --from "$OWNER" | cast to-dec)
-
 CALLDATA=$(cast calldata "$FUNCTION_SIG" $FUNCTION_ARGS)
 echo "Calldata: $CALLDATA"
 ```
@@ -282,10 +287,10 @@ Present a human-readable summary:
 
 - **Contract:** `$FLOW`
 - **Function:** `create` or `createAndDeposit`
-- **Stream ID:** `$STREAM_ID`
 - **Recipient, token, rate per second (with human-readable equivalent), start time**
 - **Deposit amount** (for `createAndDeposit`)
 - **Creation fee:** ~$1 USD in native token (`MSG_VALUE`)
+- **Expected UI slug after confirmation:** `FL3-${CHAIN_ID}-<streamId>`
 
 #### 4) Require Explicit Confirmation
 
@@ -301,27 +306,47 @@ If the caveat applies and the user does not explicitly acknowledge it, stop. If 
 A browser tab will open for the user to approve the transaction in their wallet extension.
 
 ```bash
-cast send "$FLOW" "$FUNCTION_SIG" $FUNCTION_ARGS \
+TX_HASH=$(cast send "$FLOW" "$FUNCTION_SIG" $FUNCTION_ARGS \
   --value "$MSG_VALUE" \
   --rpc-url "$RPC_URL" \
   --from "$OWNER" \
-  --browser
+  --browser \
+  --async)
 ```
 
 If `--browser` fails at runtime, ask the user to provide a private key and retry with `--private-key`.
 
-#### 6) Verify Receipt
+#### 6) Verify Receipt and Extract the Created Stream ID
 
 ```bash
-cast receipt "$TX_HASH" --rpc-url "$RPC_URL"
+CREATE_FLOW_STREAM_TOPIC0="0xedec8afa4eeca64243a519c152eab5c4f9da1bded6fbb72cba74cd128de68369"
+RECEIPT=$(cast receipt "$TX_HASH" --rpc-url "$RPC_URL" --json)
+
+STREAM_IDS=$(echo "$RECEIPT" | jq -r \
+  --arg flow "$(echo "$FLOW" | tr '[:upper:]' '[:lower:]')" \
+  --arg topic0 "$CREATE_FLOW_STREAM_TOPIC0" '
+  .logs[]
+  | select((.address | ascii_downcase) == $flow)
+  | select(.topics[0] == $topic0)
+  | .data
+' | while read -r DATA; do
+  STREAM_ID_HEX="0x$(echo "$DATA" | sed 's/^0x//' | cut -c1-64)"
+  cast to-dec "$STREAM_ID_HEX"
+done)
+
+STREAM_ID=$(printf '%s\n' "$STREAM_IDS" | sed -n '1p')
 ```
 
 #### 7) Direct User to the Stream
 
-After successful receipt verification, present the direct link to the stream:
+After successful receipt verification:
+
+- If `STREAM_ID` is empty, stop and tell the user no `CreateFlowStream` event was found in the confirmed receipt.
+- If `CHAIN_ID` is `34443` (Mode), do not promise an app link. Present the `TX_HASH`, `STREAM_ID`, and `https://modescan.io/tx/${TX_HASH}` instead.
+- Otherwise, present the direct link to the stream:
 
 ```
-https://app.sablier.com/payments/stream/$STREAM_ID
+https://app.sablier.com/payments/stream/FL3-${CHAIN_ID}-${STREAM_ID}
 ```
 
 ### Batch Flow
@@ -349,6 +374,7 @@ Present a human-readable summary:
 - **Function:** `batch(bytes[])`
 - **Number of streams**, each with: recipient, token, rate per second, start time, deposit amount (if any)
 - **Creation fee:** ~$1 USD in native token (`MSG_VALUE`) for the entire batch
+- **Expected UI slug after confirmation:** `FL3-${CHAIN_ID}-<streamId>`
 
 #### 5) Require Explicit Confirmation
 
@@ -359,24 +385,48 @@ Apply the same confirmation rule as Single Stream: show transaction details, sho
 A browser tab will open for the user to approve the transaction in their wallet extension.
 
 ```bash
-cast send "$FLOW" "batch(bytes[])" "[$CALL_1,$CALL_2,$CALL_3]" \
+TX_HASH=$(cast send "$FLOW" "batch(bytes[])" "[$CALL_1,$CALL_2,$CALL_3]" \
   --value "$MSG_VALUE" \
   --rpc-url "$RPC_URL" \
   --from "$OWNER" \
-  --browser
+  --browser \
+  --async)
 ```
 
 If `--browser` fails at runtime, ask the user to provide a private key and retry with `--private-key`.
 
-#### 7) Verify Receipt
+#### 7) Verify Receipt and Extract Created Stream IDs
 
 ```bash
-cast receipt "$TX_HASH" --rpc-url "$RPC_URL"
+CREATE_FLOW_STREAM_TOPIC0="0xedec8afa4eeca64243a519c152eab5c4f9da1bded6fbb72cba74cd128de68369"
+RECEIPT=$(cast receipt "$TX_HASH" --rpc-url "$RPC_URL" --json)
+
+STREAM_IDS=$(echo "$RECEIPT" | jq -r \
+  --arg flow "$(echo "$FLOW" | tr '[:upper:]' '[:lower:]')" \
+  --arg topic0 "$CREATE_FLOW_STREAM_TOPIC0" '
+  .logs[]
+  | select((.address | ascii_downcase) == $flow)
+  | select(.topics[0] == $topic0)
+  | .data
+' | while read -r DATA; do
+  STREAM_ID_HEX="0x$(echo "$DATA" | sed 's/^0x//' | cut -c1-64)"
+  cast to-dec "$STREAM_ID_HEX"
+done)
 ```
 
 #### 8) Direct User to the Sablier App
 
-After successful confirmation, inform the user they can view and manage streams at [app.sablier.com](https://app.sablier.com).
+After successful receipt verification:
+
+- If `STREAM_IDS` is empty, stop and tell the user no `CreateFlowStream` events were found in the confirmed receipt.
+- If `CHAIN_ID` is `34443` (Mode), do not promise app links. Present the `TX_HASH`, all extracted stream IDs, and `https://modescan.io/tx/${TX_HASH}` instead.
+- Otherwise, present one link per stream using the confirmed IDs:
+
+```bash
+printf '%s\n' "$STREAM_IDS" | while read -r STREAM_ID; do
+  echo "https://app.sablier.com/payments/stream/FL3-${CHAIN_ID}-${STREAM_ID}"
+done
+```
 
 ## Entrypoint Catalog
 
@@ -384,11 +434,13 @@ Maps each creation function to the correct `SablierFlow` calldata encoding. Refe
 
 ### Function-to-Use-Case Mapping
 
-| Function | Use Case |
-| --- | --- |
-| `create` | Stream without upfront deposit — anyone can deposit later |
-| `createAndDeposit` | Stream with immediate funding in a single transaction |
-| `batch` | Multiple streams in a single transaction |
+
+| Function           | Use Case                                                  |
+| ------------------ | --------------------------------------------------------- |
+| `create`           | Stream without upfront deposit — anyone can deposit later |
+| `createAndDeposit` | Stream with immediate funding in a single transaction     |
+| `batch`            | Multiple streams in a single transaction                  |
+
 
 ### `create`
 
@@ -470,14 +522,16 @@ ratePerSecond = (tokensPerPeriod * 1e18) / secondsInPeriod
 
 **Common rate examples:**
 
-| Desired Rate | Calculation | `ratePerSecond` Value |
-| --- | --- | --- |
-| 1 token/second | `1 * 1e18` | `1000000000000000000` |
-| 100 tokens/day | `100 * 1e18 / 86_400` | `≈ 1_157_407_407_407_407` |
-| 1,000 tokens/month | `1000 * 1e18 / 2_592_000` | `≈ 385_802_469_135_802` |
-| 5,000 tokens/month | `5000 * 1e18 / 2_592_000` | `≈ 1_929_012_345_679_012` |
-| 10,000 tokens/year | `10000 * 1e18 / 31_536_000` | `≈ 317_097_919_837_645` |
+
+| Desired Rate        | Calculation                  | `ratePerSecond` Value     |
+| ------------------- | ---------------------------- | ------------------------- |
+| 1 token/second      | `1 * 1e18`                   | `1000000000000000000`     |
+| 100 tokens/day      | `100 * 1e18 / 86_400`        | `≈ 1_157_407_407_407_407` |
+| 1,000 tokens/month  | `1000 * 1e18 / 2_592_000`    | `≈ 385_802_469_135_802`   |
+| 5,000 tokens/month  | `5000 * 1e18 / 2_592_000`    | `≈ 1_929_012_345_679_012` |
+| 10,000 tokens/year  | `10000 * 1e18 / 31_536_000`  | `≈ 317_097_919_837_645`   |
 | 120,000 tokens/year | `120000 * 1e18 / 31_536_000` | `≈ 3_805_175_038_051_750` |
+
 
 ## Worked Examples
 
@@ -487,6 +541,7 @@ A single payment stream of 1000 USDC per 30-day month (6 decimals) with 3000 USD
 
 ```bash
 FLOW="<flow-address>"    # From Supported Chains table
+CHAIN_ID="1"             # Ethereum mainnet
 TOKEN="0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"  # USDC on Ethereum
 # Calculate MSG_VALUE per the "Creation Fee" section
 SENDER=$(cast wallet address --browser)
@@ -498,13 +553,14 @@ RATE="385802469135802"
 # 3000 USDC = 3000 * 1e6 = 3_000_000_000 (6-decimal base units)
 AMOUNT="3000000000"
 
-cast send "$FLOW" \
+TX_HASH=$(cast send "$FLOW" \
   "createAndDeposit(address,address,uint128,uint40,address,bool,uint128)" \
   "$SENDER" "$RECIPIENT" "$RATE" 0 "$TOKEN" true "$AMOUNT" \
   --value "$MSG_VALUE" \
   --rpc-url "$RPC_URL" \
   --from "$SENDER" \
-  --browser
+  --browser \
+  --async)
 ```
 
 Notes:
@@ -515,6 +571,7 @@ Notes:
 - `true` for `transferable` = the stream NFT can be transferred
 - ERC-20 approval for 3000000000 USDC to the `SablierFlow` contract is required before this call
 - `MSG_VALUE` = ~$1 USD worth of native token (see [Creation Fee](#creation-fee-msg_value))
+- After confirmation, extract the real `streamId` from the `CreateFlowStream` log in the confirmed receipt and build the final app link as `https://app.sablier.com/payments/stream/FL3-${CHAIN_ID}-${STREAM_ID}`
 
 ### Single Stream: `create` (No Deposit)
 
@@ -522,6 +579,7 @@ A payment stream of 5000 DAI per month with no upfront deposit — the sender or
 
 ```bash
 FLOW="<flow-address>"    # From Supported Chains table
+CHAIN_ID="1"             # Ethereum mainnet
 TOKEN="0x6B175474E89094C44Da98b954EedeAC495271d0F"  # DAI on Ethereum
 SENDER=$(cast wallet address --browser)
 RECIPIENT="0x..."
@@ -529,13 +587,14 @@ RECIPIENT="0x..."
 # ratePerSecond = 5000 * 1e18 / 2_592_000 ≈ 1_929_012_345_679_012
 RATE="1929012345679012"
 
-cast send "$FLOW" \
+TX_HASH=$(cast send "$FLOW" \
   "create(address,address,uint128,uint40,address,bool)" \
   "$SENDER" "$RECIPIENT" "$RATE" 0 "$TOKEN" true \
   --value "$MSG_VALUE" \
   --rpc-url "$RPC_URL" \
   --from "$SENDER" \
-  --browser
+  --browser \
+  --async)
 ```
 
 Notes:
@@ -543,6 +602,7 @@ Notes:
 - No ERC-20 approval needed — no tokens are transferred at creation time
 - The stream starts accruing debt immediately but remains insolvent until someone deposits
 - `MSG_VALUE` = ~$1 USD worth of native token (see [Creation Fee](#creation-fee-msg_value))
+- After confirmation, extract the real `streamId` from the `CreateFlowStream` log in the confirmed receipt and build the final app link as `https://app.sablier.com/payments/stream/FL3-${CHAIN_ID}-${STREAM_ID}`
 
 ### Batch of Streams: 3x `create`
 
@@ -550,6 +610,7 @@ A batch of three payment streams of 1000 USDC per month each to different recipi
 
 ```bash
 FLOW="<flow-address>"    # From Supported Chains table
+CHAIN_ID="1"             # Ethereum mainnet
 TOKEN="0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"  # USDC on Ethereum
 # Calculate MSG_VALUE per the "Creation Fee" section
 SENDER=$(cast wallet address --browser)
@@ -566,11 +627,12 @@ CALL_2=$(cast calldata "$FUNCTION_SIG" \
 CALL_3=$(cast calldata "$FUNCTION_SIG" \
   "$SENDER" "0xRecipient3" "$RATE" 0 "$TOKEN" true)
 
-cast send "$FLOW" "batch(bytes[])" "[$CALL_1,$CALL_2,$CALL_3]" \
+TX_HASH=$(cast send "$FLOW" "batch(bytes[])" "[$CALL_1,$CALL_2,$CALL_3]" \
   --value "$MSG_VALUE" \
   --rpc-url "$RPC_URL" \
   --from "$SENDER" \
-  --browser
+  --browser \
+  --async)
 ```
 
 Notes:
@@ -579,41 +641,49 @@ Notes:
 - `MSG_VALUE` = ~$1 USD worth of native token for the entire batch
 - All three streams use the same `SablierFlow` contract and the same `batch()` entrypoint
 - You can mix `create` and `createAndDeposit` calls in the same batch
+- After confirmation, extract all `streamId` values from the confirmed receipt and build one final link per stream as `https://app.sablier.com/payments/stream/FL3-${CHAIN_ID}-${STREAM_ID}`
 - For more than 50 streams, direct the user to the [Sablier UI](https://app.sablier.com)
 
 ## Supported Chains
 
 Use this registry to resolve chain metadata, RPC endpoints, and `SablierFlow` contract addresses:
 
-| Chain | Chain ID | Native Asset | SablierFlow | RPC URL |
-| --- | --- | --- | --- | --- |
-| Ethereum | `1` | ETH | `0x7a86d3e6894f9c5b5f25ffbdaae658cfc7569623` | `https://ethereum-rpc.publicnode.com` |
-| Abstract | `2741` | ETH | `0xc415425e56cc6c42b87bacffb276db2292cc1e50` | `https://api.mainnet.abs.xyz` |
-| Arbitrum | `42161` | ETH | `0xf0f6477422a346378458f73cf02f05a7492e0c25` | `https://arb1.arbitrum.io/rpc` |
-| Avalanche | `43114` | AVAX | `0x64dc318ba879eca8222e963d319728f211c600c7` | `https://api.avax.network/ext/bc/C/rpc` |
-| Base | `8453` | ETH | `0x8551208f75375abfaee1fbe0a69e390a94000ec2` | `https://mainnet.base.org` |
-| Berachain | `80094` | BERA | `0xb89cc68b2ef376ca1b9645f109f7a490b180cf1b` | `https://rpc.berachain.com` |
-| Blast | `81457` | ETH | `0x13ce2ca4602d5d1dd323014cd5a4e8414d310a06` | `https://rpc.blast.io` |
-| BNB Chain | `56` | BNB | `0x5505c2397B0BeBEEE64919F21Df84F83C008C51b` | `https://bsc-dataseed1.bnbchain.org` |
-| Chiliz | `88888` | CHZ | `0x21797da50e180d24d6a68e8be6f8daca1c06f0ee` | `https://rpc.chiliz.com` |
-| Core Dao | `1116` | CORE | `0x4cb7fb49e4b646b472a5609804004722b3b94f93` | `https://rpc.coredao.org` |
-| Denergy | `369369` | WATT | `0xB2Fc49d89B72cD8Aadd7f07D602CF005D5A017Ea` | `https://rpc.d.energy` |
-| Gnosis | `100` | xDAI | `0xcdd3eb5283e4a675f16ba83e9d8c28c871a550a2` | `https://rpc.gnosischain.com` |
-| HyperEVM | `999` | HYPE | `0x70ce7795896c1e226C71360F9d77B743d8302182` | `https://rpc.hyperliquid.xyz/evm` |
-| Lightlink | `1890` | ETH | `0x5f742f6becc61e76ae67b0dc29d58f5c964e2c78` | `https://replicator.phoenix.lightlink.io/rpc/v1` |
-| Linea Mainnet | `59144` | ETH | `0x977FDf70abeD6b60eECcee85322beA4575B0b6Ed` | `https://rpc.linea.build` |
-| Mode | `34443` | ETH | `0xbed2f163cc0aa3278261ef1c3fa51b98db270829` | `https://mainnet.mode.network` |
-| Monad | `143` | MON | `0x0340a829b6dC3aDF7710a5bAF1970914af4977f5` | `https://rpc.monad.xyz` |
-| Morph | `2818` | ETH | `0xbf407836021c993dfa27cb8232415d15faea709a` | `https://rpc.morphl2.io` |
-| OP Mainnet | `10` | ETH | `0xd18491649440d6338532f260761cee64e79d7bb2` | `https://mainnet.optimism.io` |
-| Polygon | `137` | POL | `0x62b6d5a3ac0cc91ecebd019d1c70fe955d8c7426` | `https://polygon-bor-rpc.publicnode.com` |
-| Scroll | `534352` | ETH | `0xc3e92b9714ed01b51fdc29bb88b17af5cddd2c22` | `https://rpc.scroll.io` |
-| Sei Network | `1329` | SEI | `0x9eaf5a3f23964148a1321078f9cce4c2325c603e` | `https://evm-rpc.sei-apis.com` |
-| Sonic | `146` | S | `0x3954146884425accb86a6476dad69ec3591838cd` | `https://rpc.soniclabs.com` |
-| Superseed | `5330` | ETH | `0xe91bbae6c7d67b7c5055de1c9635c17af056211b` | `https://mainnet.superseed.xyz` |
-| Unichain | `130` | ETH | `0x170ecc032c96aa976fa702e94fbc9fa5bb64ee7c` | `https://mainnet.unichain.org` |
-| XDC | `50` | XDC | `0x3F00b8334EBE2A85875D1F8b50a43a12db67ACAD` | `https://rpc.xinfin.network` |
-| ZKsync Era | `324` | ETH | `0xa7f02e692973b6315eaca7fb4285ad2536a89cd0` | `https://mainnet.era.zksync.io` |
-| Sepolia | `11155111` | ETH | `0xde489096eC9C718358c52a8BBe4ffD74857356e9` | `https://ethereum-sepolia-rpc.publicnode.com` |
+UI support note:
+
+- The Flow v2.0 UI alias is `FL3`, so supported payment links use `https://app.sablier.com/payments/stream/FL3-${CHAIN_ID}-${STREAM_ID}`.
+- Mode is deployed onchain but not currently supported in the Sablier UI. For Mode, report the confirmed `streamId` values, the transaction hash, and `https://modescan.io/tx/${TX_HASH}` instead of generating app links.
+
+
+| Chain         | Chain ID   | Native Asset | SablierFlow                                  | RPC URL                                          |
+| ------------- | ---------- | ------------ | -------------------------------------------- | ------------------------------------------------ |
+| Ethereum      | `1`        | ETH          | `0x7a86d3e6894f9c5b5f25ffbdaae658cfc7569623` | `https://ethereum-rpc.publicnode.com`            |
+| Abstract      | `2741`     | ETH          | `0xc415425e56cc6c42b87bacffb276db2292cc1e50` | `https://api.mainnet.abs.xyz`                    |
+| Arbitrum      | `42161`    | ETH          | `0xf0f6477422a346378458f73cf02f05a7492e0c25` | `https://arb1.arbitrum.io/rpc`                   |
+| Avalanche     | `43114`    | AVAX         | `0x64dc318ba879eca8222e963d319728f211c600c7` | `https://api.avax.network/ext/bc/C/rpc`          |
+| Base          | `8453`     | ETH          | `0x8551208f75375abfaee1fbe0a69e390a94000ec2` | `https://mainnet.base.org`                       |
+| Berachain     | `80094`    | BERA         | `0xb89cc68b2ef376ca1b9645f109f7a490b180cf1b` | `https://rpc.berachain.com`                      |
+| Blast         | `81457`    | ETH          | `0x13ce2ca4602d5d1dd323014cd5a4e8414d310a06` | `https://rpc.blast.io`                           |
+| BNB Chain     | `56`       | BNB          | `0x5505c2397B0BeBEEE64919F21Df84F83C008C51b` | `https://bsc-dataseed1.bnbchain.org`             |
+| Chiliz        | `88888`    | CHZ          | `0x21797da50e180d24d6a68e8be6f8daca1c06f0ee` | `https://rpc.chiliz.com`                         |
+| Core Dao      | `1116`     | CORE         | `0x4cb7fb49e4b646b472a5609804004722b3b94f93` | `https://rpc.coredao.org`                        |
+| Denergy       | `369369`   | WATT         | `0xB2Fc49d89B72cD8Aadd7f07D602CF005D5A017Ea` | `https://rpc.d.energy`                           |
+| Gnosis        | `100`      | xDAI         | `0xcdd3eb5283e4a675f16ba83e9d8c28c871a550a2` | `https://rpc.gnosischain.com`                    |
+| HyperEVM      | `999`      | HYPE         | `0x70ce7795896c1e226C71360F9d77B743d8302182` | `https://rpc.hyperliquid.xyz/evm`                |
+| Lightlink     | `1890`     | ETH          | `0x5f742f6becc61e76ae67b0dc29d58f5c964e2c78` | `https://replicator.phoenix.lightlink.io/rpc/v1` |
+| Linea Mainnet | `59144`    | ETH          | `0x977FDf70abeD6b60eECcee85322beA4575B0b6Ed` | `https://rpc.linea.build`                        |
+| Mode          | `34443`    | ETH          | `0xbed2f163cc0aa3278261ef1c3fa51b98db270829` | `https://mainnet.mode.network`                   |
+| Monad         | `143`      | MON          | `0x0340a829b6dC3aDF7710a5bAF1970914af4977f5` | `https://rpc.monad.xyz`                          |
+| Morph         | `2818`     | ETH          | `0xbf407836021c993dfa27cb8232415d15faea709a` | `https://rpc.morphl2.io`                         |
+| OP Mainnet    | `10`       | ETH          | `0xd18491649440d6338532f260761cee64e79d7bb2` | `https://mainnet.optimism.io`                    |
+| Polygon       | `137`      | POL          | `0x62b6d5a3ac0cc91ecebd019d1c70fe955d8c7426` | `https://polygon-bor-rpc.publicnode.com`         |
+| Scroll        | `534352`   | ETH          | `0xc3e92b9714ed01b51fdc29bb88b17af5cddd2c22` | `https://rpc.scroll.io`                          |
+| Sei Network   | `1329`     | SEI          | `0x9eaf5a3f23964148a1321078f9cce4c2325c603e` | `https://evm-rpc.sei-apis.com`                   |
+| Sonic         | `146`      | S            | `0x3954146884425accb86a6476dad69ec3591838cd` | `https://rpc.soniclabs.com`                      |
+| Superseed     | `5330`     | ETH          | `0xe91bbae6c7d67b7c5055de1c9635c17af056211b` | `https://mainnet.superseed.xyz`                  |
+| Unichain      | `130`      | ETH          | `0x170ecc032c96aa976fa702e94fbc9fa5bb64ee7c` | `https://mainnet.unichain.org`                   |
+| XDC           | `50`       | XDC          | `0x3F00b8334EBE2A85875D1F8b50a43a12db67ACAD` | `https://rpc.xinfin.network`                     |
+| ZKsync Era    | `324`      | ETH          | `0xa7f02e692973b6315eaca7fb4285ad2536a89cd0` | `https://mainnet.era.zksync.io`                  |
+| Sepolia       | `11155111` | ETH          | `0xde489096eC9C718358c52a8BBe4ffD74857356e9` | `https://ethereum-sepolia-rpc.publicnode.com`    |
+
 
 Ethereum can also be referred to as "Mainnet".

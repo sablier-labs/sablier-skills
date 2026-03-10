@@ -13,8 +13,8 @@ Use this sequence for every state-changing operation:
 3. Build and show a human-readable transaction preview (no broadcast).
 4. Require explicit user confirmation.
 5. Broadcast with `cast send`.
-6. Verify the receipt.
-7. Direct the user to the stream on [app.sablier.com](https://app.sablier.com).
+6. Verify the receipt and derive the created stream ID or IDs from Lockup create events.
+7. If the chain is supported in the Sablier UI, direct the user to the stream page on [app.sablier.com](https://app.sablier.com). Otherwise, present the receipt summary and explorer link.
 
 If ERC-20 allowance is insufficient, execute an `approve` transaction first, then resume at step 2.
 
@@ -201,6 +201,7 @@ cast call "$TOKEN" "allowance(address,address)(uint256)" "$OWNER" "$LOCKUP" --rp
 #### 1) Resolve RPC URL, signing method, and sender address
 
 ```bash
+CHAIN_ID="<resolved-chain-id>"
 RPC_URL="<resolved-or-user-provided-rpc>"
 
 # Resolve sender address from browser wallet (opens a browser tab for the user to connect)
@@ -215,13 +216,9 @@ Run all checks from [Preflight Checks](#preflight-checks), calculate `MSG_VALUE`
 
 #### 3) Preview Transaction (No Broadcast)
 
-Simulate the transaction to capture the stream ID, then build and display calldata so the user can review before signing:
+Build and display calldata so the user can review the exact transaction before signing:
 
 ```bash
-# Simulate to get the stream ID (dry run, no broadcast)
-STREAM_ID=$(cast call "$LOCKUP" "$FUNCTION_SIG" $FUNCTION_ARGS \
-  --value "$MSG_VALUE" --rpc-url "$RPC_URL" --from "$OWNER" | cast to-dec)
-
 CALLDATA=$(cast calldata "$FUNCTION_SIG" $FUNCTION_ARGS)
 echo "Calldata: $CALLDATA"
 ```
@@ -230,9 +227,9 @@ Present a human-readable summary:
 
 - **Contract:** `$LOCKUP`
 - **Function:** chosen `create*` entrypoint
-- **Stream ID:** `$STREAM_ID`
 - **Recipient, token, amount, shape, duration/timestamps**
 - **Creation fee:** ~$1 USD in native token (`MSG_VALUE`)
+- **Expected UI slug after confirmation:** `LK2-${CHAIN_ID}-<streamId>`
 
 #### 4) Require Explicit Confirmation
 
@@ -247,27 +244,48 @@ If the user does not explicitly confirm, stop.
 A browser tab will open for the user to approve the transaction in their wallet extension.
 
 ```bash
-cast send "$LOCKUP" "$FUNCTION_SIG" $FUNCTION_ARGS \
+TX_HASH=$(cast send "$LOCKUP" "$FUNCTION_SIG" $FUNCTION_ARGS \
   --value "$MSG_VALUE" \
   --rpc-url "$RPC_URL" \
   --from "$OWNER" \
-  --browser
+  --browser \
+  --async)
 ```
 
 If `--browser` fails at runtime, ask the user to provide a private key and retry with `--private-key`.
 
-#### 6) Verify Receipt
+#### 6) Verify Receipt and Extract the Created Stream ID
 
 ```bash
-cast receipt "$TX_HASH" --rpc-url "$RPC_URL"
+CREATE_LL_TOPIC0="0xc79bd540ef5a04a4ac63a943cd4fb703e8a730be1368c34f4c31bb7142bbdb3a"
+CREATE_LT_TOPIC0="0xb5286ba059f8139658108ff5a9617e2ba55bd80fb2dd93063f9f9bc0e65c4c2a"
+RECEIPT=$(cast receipt "$TX_HASH" --rpc-url "$RPC_URL" --json)
+
+STREAM_IDS=$(echo "$RECEIPT" | jq -r \
+  --arg lockup "$(echo "$LOCKUP" | tr '[:upper:]' '[:lower:]')" \
+  --arg create_ll "$CREATE_LL_TOPIC0" \
+  --arg create_lt "$CREATE_LT_TOPIC0" '
+  .logs[]
+  | select((.address | ascii_downcase) == $lockup)
+  | select(.topics[0] == $create_ll or .topics[0] == $create_lt)
+  | .topics[1]
+' | while read -r STREAM_ID_HEX; do
+  cast to-dec "$STREAM_ID_HEX"
+done)
+
+STREAM_ID=$(printf '%s\n' "$STREAM_IDS" | sed -n '1p')
 ```
 
 #### 7) Direct User to the Stream
 
-After successful receipt verification, present the direct link to the stream:
+After successful receipt verification:
+
+- If `STREAM_ID` is empty, stop and tell the user no Lockup create event was found in the confirmed receipt.
+- If `CHAIN_ID` is `34443` (Mode), do not promise an app link. Present the `TX_HASH`, `STREAM_ID`, and `https://modescan.io/tx/${TX_HASH}` instead.
+- Otherwise, present the direct link to the stream:
 
 ```
-https://app.sablier.com/vesting/stream/$LOCKUP-$STREAM_ID
+https://app.sablier.com/vesting/stream/LK2-${CHAIN_ID}-${STREAM_ID}
 ```
 
 ### Batch Flow
@@ -293,6 +311,7 @@ Present a human-readable summary:
 - **Function:** `batch(bytes[])`
 - **Number of streams**, each with: recipient, amount, shape, duration
 - **Creation fee:** ~$1 USD in native token (`MSG_VALUE`) for the entire batch
+- **Expected UI slug after confirmation:** `LK2-${CHAIN_ID}-<streamId>`
 
 #### 5) Require Explicit Confirmation
 
@@ -303,24 +322,49 @@ Apply the same confirmation rule as Single Stream: show transaction details and 
 A browser tab will open for the user to approve the transaction in their wallet extension.
 
 ```bash
-cast send "$LOCKUP" "batch(bytes[])" "[$CALL_1,$CALL_2,$CALL_3]" \
+TX_HASH=$(cast send "$LOCKUP" "batch(bytes[])" "[$CALL_1,$CALL_2,$CALL_3]" \
   --value "$MSG_VALUE" \
   --rpc-url "$RPC_URL" \
   --from "$OWNER" \
-  --browser
+  --browser \
+  --async)
 ```
 
 If `--browser` fails at runtime, ask the user to provide a private key and retry with `--private-key`.
 
-#### 7) Verify Receipt
+#### 7) Verify Receipt and Extract Created Stream IDs
 
 ```bash
-cast receipt "$TX_HASH" --rpc-url "$RPC_URL"
+CREATE_LL_TOPIC0="0xc79bd540ef5a04a4ac63a943cd4fb703e8a730be1368c34f4c31bb7142bbdb3a"
+CREATE_LT_TOPIC0="0xb5286ba059f8139658108ff5a9617e2ba55bd80fb2dd93063f9f9bc0e65c4c2a"
+RECEIPT=$(cast receipt "$TX_HASH" --rpc-url "$RPC_URL" --json)
+
+STREAM_IDS=$(echo "$RECEIPT" | jq -r \
+  --arg lockup "$(echo "$LOCKUP" | tr '[:upper:]' '[:lower:]')" \
+  --arg create_ll "$CREATE_LL_TOPIC0" \
+  --arg create_lt "$CREATE_LT_TOPIC0" '
+  .logs[]
+  | select((.address | ascii_downcase) == $lockup)
+  | select(.topics[0] == $create_ll or .topics[0] == $create_lt)
+  | .topics[1]
+' | while read -r STREAM_ID_HEX; do
+  cast to-dec "$STREAM_ID_HEX"
+done)
 ```
 
 #### 8) Direct User to the Sablier App
 
-After successful receipt verification, direct the user to view and manage their streams at [app.sablier.com/vesting](https://app.sablier.com/vesting).
+After successful receipt verification:
+
+- If `STREAM_IDS` is empty, stop and tell the user no Lockup create events were found in the confirmed receipt.
+- If `CHAIN_ID` is `34443` (Mode), do not promise app links. Present the `TX_HASH`, all extracted stream IDs, and `https://modescan.io/tx/${TX_HASH}` instead.
+- Otherwise, present one link per stream using the confirmed IDs:
+
+```bash
+printf '%s\n' "$STREAM_IDS" | while read -r STREAM_ID; do
+  echo "https://app.sablier.com/vesting/stream/LK2-${CHAIN_ID}-${STREAM_ID}"
+done
+```
 
 ## Entrypoint Catalog
 
@@ -456,12 +500,13 @@ A single cliff stream of 1000 USDC (6 decimals) with a 90-day cliff and 365-day 
 
 ```bash
 LOCKUP="<lockup-address>"    # From Supported Chains table
+CHAIN_ID="1"                 # Ethereum mainnet
 TOKEN="0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"  # USDC on Ethereum
 # Calculate MSG_VALUE per the "Creation Fee" section
 SENDER=$(cast wallet address --browser)
 RECIPIENT="0x..."
 
-cast send "$LOCKUP" \
+TX_HASH=$(cast send "$LOCKUP" \
   "createWithDurationsLL((address,address,uint128,address,bool,bool,string),(uint128,uint128),(uint40,uint40))" \
   "($SENDER,$RECIPIENT,1000000000,$TOKEN,true,true,cliff)" \
   "(0,0)" \
@@ -469,7 +514,8 @@ cast send "$LOCKUP" \
   --value "$MSG_VALUE" \
   --rpc-url "$RPC_URL" \
   --from "$SENDER" \
-  --browser
+  --browser \
+  --async)
 ```
 
 Notes:
@@ -479,6 +525,7 @@ Notes:
 - `(0,0)` = no start unlock and no lump-sum cliff unlock amount
 - `(7776000,31536000)` = 90-day cliff and 365-day total duration, both in seconds
 - `MSG_VALUE` = ~$1 USD worth of native token (see [Creation Fee](#creation-fee-msg_value))
+- After confirmation, extract the real `streamId` from the Lockup create event in the confirmed receipt and build the final app link as `https://app.sablier.com/vesting/stream/LK2-${CHAIN_ID}-${STREAM_ID}`
 
 ### Batch of Streams: 3x `createWithDurationsLL`
 
@@ -486,6 +533,7 @@ A batch of three linear streams of 1000 USDC each to different recipients, with 
 
 ```bash
 LOCKUP="<lockup-address>"    # From Supported Chains table
+CHAIN_ID="1"                 # Ethereum mainnet
 TOKEN="0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"  # USDC on Ethereum
 # Calculate MSG_VALUE per the "Creation Fee" section
 SENDER=$(cast wallet address --browser)
@@ -499,11 +547,12 @@ CALL_2=$(cast calldata "$FUNCTION_SIG" \
 CALL_3=$(cast calldata "$FUNCTION_SIG" \
   "($SENDER,0xRecipient3,1000000000,$TOKEN,true,true,linear)" "(0,0)" "(0,31536000)")
 
-cast send "$LOCKUP" "batch(bytes[])" "[$CALL_1,$CALL_2,$CALL_3]" \
+TX_HASH=$(cast send "$LOCKUP" "batch(bytes[])" "[$CALL_1,$CALL_2,$CALL_3]" \
   --value "$MSG_VALUE" \
   --rpc-url "$RPC_URL" \
   --from "$SENDER" \
-  --browser
+  --browser \
+  --async)
 ```
 
 Notes:
@@ -512,11 +561,17 @@ Notes:
 - `linear` selects the Linear shape
 - `MSG_VALUE` = ~$1 USD worth of native token for the entire batch
 - All three streams use the same `SablierLockup` contract and the same `batch()` entrypoint
+- After confirmation, extract all `streamId` values from the confirmed receipt and build one final link per stream as `https://app.sablier.com/vesting/stream/LK2-${CHAIN_ID}-${STREAM_ID}`
 - For more than 50 streams, direct the user to the [Sablier UI](https://app.sablier.com)
 
 ## Supported Chains
 
 Use this registry to resolve chain metadata, RPC endpoints, native asset pricing, and `SablierLockup` contract addresses:
+
+UI support note:
+
+- The Lockup v3.0 UI alias is `LK2`, so supported vesting links use `https://app.sablier.com/vesting/stream/LK2-${CHAIN_ID}-${STREAM_ID}`.
+- Mode is deployed onchain but not currently supported in the Sablier UI. For Mode, report the confirmed `streamId` values, the transaction hash, and `https://modescan.io/tx/${TX_HASH}` instead of generating app links.
 
 | Chain | Chain ID | Native Asset | SablierLockup | RPC URL |
 | --- | --- | --- | --- | --- |

@@ -57,6 +57,14 @@ If any of the following are missing or ambiguous from the user's input, use the 
 
 Do not guess or silently apply defaults for the streaming rate, recipient, or upfront funding decision. Only proceed once all required inputs are confirmed.
 
+If the user explicitly requests a streaming amount `"per month"`:
+
+- Do not imply that Flow can deliver the exact same amount for each calendar month.
+- Keep the request on Sablier Flow. Do not reroute to `sablier-create-vesting` solely because the user asked for a monthly rate.
+- Before the final broadcast confirmation (`YES`), require a separate acknowledgment that Flow uses a fixed per-second rate, calendar months have unequal numbers of seconds, and exact calendar-month equality is not possible.
+- State that the requested `"per month"` amount will be implemented using a 30-day month approximation for the `ratePerSecond` calculation.
+- Only add this caveat when the user explicitly used `"per month"` in their request. Do not add it for other periods or for monthly wording introduced by the agent.
+
 ### 4. Infer intent before selecting references
 
 1. **Execution intent:** user wants the agent to create a payment stream on their behalf (run CLI transactions).

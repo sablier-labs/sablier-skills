@@ -16,11 +16,6 @@ Multiple streams can be created in a single transaction using the built-in `batc
 4. If `createAndDeposit`: tokens are transferred from `msg.sender` to the Flow contract.
 5. The stream starts accruing debt from `startTime` (or `block.timestamp` if `startTime` is 0). If `startTime` is in the past, debt accrues retroactively from that past timestamp.
 
-**Stream statuses after creation:**
-
-- `startTime` in the future → `PENDING` (no debt accrues yet)
-- `startTime` now or in the past → `STREAMING_SOLVENT` (if deposited) or `STREAMING_INSOLVENT` (if no deposit)
-
 ## References
 
 - **Sablier documentation (LLM-optimized):** <https://docs.sablier.com/llms.txt>

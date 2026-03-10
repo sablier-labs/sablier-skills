@@ -54,10 +54,26 @@ Always use this sequence for state-changing transactions:
 
 1. Build a human-readable preview of the transaction parameters.
 2. Show the transaction details to the user.
-3. Ask for explicit confirmation.
-4. Only after confirmation, run `cast send`.
+3. If the user explicitly requested an amount `"per month"`, show the [Calendar-Month Caveat for Explicit `"per month"` Requests](#calendar-month-caveat-for-explicit-per-month-requests) and require acknowledgment before continuing.
+4. Ask for explicit confirmation.
+5. Only after confirmation, run `cast send`.
 
 Never broadcast before explicit user confirmation.
+
+#### Calendar-Month Caveat for Explicit `"per month"` Requests
+
+If and only if the user explicitly requested an amount `"per month"`, show this caveat immediately before the final `YES` confirmation prompt:
+
+> **Calendar-Month Caveat**
+> Sablier Flow uses a fixed per-second streaming rate.
+> Exact "same amount every calendar month" streaming is not possible because calendar months have different numbers of seconds.
+> Your requested `"per month"` amount will be implemented using a **30-day month approximation** to calculate `ratePerSecond`.
+>
+> Reply exactly: `I UNDERSTAND`
+
+- Do not show this caveat unless the user explicitly used `"per month"` in their request.
+- Do not show it for monthly wording introduced by the agent.
+- If the user does not explicitly acknowledge the caveat, stop.
 
 ## Intake & Planning Inputs
 
@@ -118,7 +134,7 @@ ratePerSecond = (1000 * 1e18) / 2_592_000
 ```
 
 - The `UD21x18` type represents `1e18` as 1 whole token per second, regardless of the token's actual decimals. The contract handles decimal scaling internally.
-- If the user provides a rate like "1000 per month", convert it. Do not ask the user to calculate the rate themselves.
+- If the user provides a rate like "1000 per month", convert it using a 30-day month approximation. Do not ask the user to calculate the rate themselves.
 - If the user does not provide a rate, ask them to specify how many tokens per time period they want to stream.
 
 ### 4) Resolve Chain and `SablierFlow`
@@ -251,9 +267,13 @@ Run all checks from [Preflight Checks](#preflight-checks), calculate `MSG_VALUE`
 
 #### 3) Preview Transaction (No Broadcast)
 
-Build and display calldata so the user can review before signing:
+Simulate the transaction to capture the stream ID, then build and display calldata so the user can review before signing:
 
 ```bash
+# Simulate to get the stream ID (dry run, no broadcast)
+STREAM_ID=$(cast call "$FLOW" "$FUNCTION_SIG" $FUNCTION_ARGS \
+  --value "$MSG_VALUE" --rpc-url "$RPC_URL" --from "$OWNER" | cast to-dec)
+
 CALLDATA=$(cast calldata "$FUNCTION_SIG" $FUNCTION_ARGS)
 echo "Calldata: $CALLDATA"
 ```
@@ -262,17 +282,19 @@ Present a human-readable summary:
 
 - **Contract:** `$FLOW`
 - **Function:** `create` or `createAndDeposit`
+- **Stream ID:** `$STREAM_ID`
 - **Recipient, token, rate per second (with human-readable equivalent), start time**
 - **Deposit amount** (for `createAndDeposit`)
 - **Creation fee:** ~$1 USD in native token (`MSG_VALUE`)
 
 #### 4) Require Explicit Confirmation
 
-Use a clear confirmation prompt, for example:
+Use a clear confirmation flow:
 
-- `Confirm broadcast? Reply exactly: YES`
+- If the Calendar-Month Caveat applies, show it first and require: `Reply exactly: I UNDERSTAND`
+- Then ask: `Confirm broadcast? Reply exactly: YES`
 
-If the user does not explicitly confirm, stop.
+If the caveat applies and the user does not explicitly acknowledge it, stop. If the user does not explicitly confirm with `YES`, stop.
 
 #### 5) Broadcast After Confirmation
 
@@ -294,9 +316,13 @@ If `--browser` fails at runtime, ask the user to provide a private key and retry
 cast receipt "$TX_HASH" --rpc-url "$RPC_URL"
 ```
 
-#### 7) Direct User to the Sablier App
+#### 7) Direct User to the Stream
 
-After successful confirmation, inform the user they can view and manage streams at [app.sablier.com](https://app.sablier.com).
+After successful receipt verification, present the direct link to the stream:
+
+```
+https://app.sablier.com/payments/stream/$STREAM_ID
+```
 
 ### Batch Flow
 
@@ -326,7 +352,7 @@ Present a human-readable summary:
 
 #### 5) Require Explicit Confirmation
 
-Apply the same confirmation rule as Single Stream: show transaction details and require explicit user confirmation before broadcast.
+Apply the same confirmation rule as Single Stream: show transaction details, show the Calendar-Month Caveat first if it applies, and require explicit user confirmation before broadcast.
 
 #### 6) Broadcast After Confirmation
 

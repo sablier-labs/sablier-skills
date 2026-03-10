@@ -13,10 +13,10 @@ Use this sequence for every state-changing operation:
 3. Build and show a human-readable transaction preview (no broadcast).
 4. Require explicit user confirmation.
 5. Broadcast with `cast send`.
-6. Verify the receipt and derive the created stream ID or IDs from Lockup create events.
+6. Wait/poll up to 5 minutes for the confirmed receipt, then derive the created stream ID or IDs from Lockup create events.
 7. Direct the user to the stream page on [app.sablier.com](https://app.sablier.com).
 
-If ERC-20 allowance is insufficient, execute an `approve` transaction first, then resume at step 2.
+If ERC-20 allowance is insufficient, execute an `approve` transaction first, wait/poll up to 5 minutes for its confirmed receipt, then resume at step 2.
 
 ## Mandatory Guardrails
 
@@ -58,6 +58,30 @@ Always use this sequence for state-changing transactions:
 4. Only after confirmation, run `cast send`.
 
 Never broadcast before explicit user confirmation.
+
+### Receipt Wait Timeout (Mandatory)
+
+For every broadcasted transaction (`approve`, Lockup single-stream creation, and `batch`), wait/poll for a confirmed receipt for up to **5 minutes** before treating the transaction as failed or unconfirmed.
+
+Use this polling pattern for receipt verification:
+
+```bash
+RECEIPT=""
+START_TIME=$(date +%s)
+
+while true; do
+  RECEIPT=$(cast receipt "$TX_HASH" --rpc-url "$RPC_URL" --json 2>/dev/null) && break
+
+  if [ "$(($(date +%s) - START_TIME))" -ge 300 ]; then
+    echo "Timed out waiting for a confirmed receipt after 5 minutes: $TX_HASH"
+    exit 1
+  fi
+
+  sleep 5
+done
+```
+
+If the receipt is still unavailable after 5 minutes, stop, tell the user the transaction may still be pending, and share the transaction hash for manual follow-up.
 
 ## Intake & Planning Inputs
 
@@ -210,7 +234,7 @@ OWNER=$(cast wallet address --browser)
 
 #### 2) Run preflight checks and handle `approve` if needed
 
-Run all checks from [Preflight Checks](#preflight-checks), calculate `MSG_VALUE` per the [Creation Fee](#creation-fee-msg_value) section, and re-run the native gas check before each broadcast (`approve` and stream creation). If an ERC-20 `approve` transaction is needed, execute it before continuing to step 3.
+Run all checks from [Preflight Checks](#preflight-checks), calculate `MSG_VALUE` per the [Creation Fee](#creation-fee-msg_value) section, and re-run the native gas check before each broadcast (`approve` and stream creation). If an ERC-20 `approve` transaction is needed, execute it, wait/poll up to 5 minutes for the confirmed receipt per [Receipt Wait Timeout (Mandatory)](#receipt-wait-timeout-mandatory), then continue to step 3.
 
 ### Single Stream Flow
 
@@ -260,7 +284,19 @@ If `--browser` fails at runtime, ask the user to provide a private key and retry
 ```bash
 CREATE_LL_TOPIC0="0xc79bd540ef5a04a4ac63a943cd4fb703e8a730be1368c34f4c31bb7142bbdb3a"
 CREATE_LT_TOPIC0="0xb5286ba059f8139658108ff5a9617e2ba55bd80fb2dd93063f9f9bc0e65c4c2a"
-RECEIPT=$(cast receipt "$TX_HASH" --rpc-url "$RPC_URL" --json)
+RECEIPT=""
+START_TIME=$(date +%s)
+
+while true; do
+  RECEIPT=$(cast receipt "$TX_HASH" --rpc-url "$RPC_URL" --json 2>/dev/null) && break
+
+  if [ "$(($(date +%s) - START_TIME))" -ge 300 ]; then
+    echo "Timed out waiting for a confirmed receipt after 5 minutes: $TX_HASH"
+    exit 1
+  fi
+
+  sleep 5
+done
 
 STREAM_IDS=$(echo "$RECEIPT" | jq -r \
   --arg lockup "$(echo "$LOCKUP" | tr '[:upper:]' '[:lower:]')" \
@@ -279,7 +315,7 @@ STREAM_ID=$(printf '%s\n' "$STREAM_IDS" | sed -n '1p')
 
 #### 7) Direct User to the Stream
 
-After successful receipt verification:
+After successful receipt verification within the 5-minute timeout:
 
 - If `STREAM_ID` is empty, stop and tell the user no Lockup create event was found in the confirmed receipt.
 - Present the direct link to the stream:
@@ -339,7 +375,19 @@ If `--browser` fails at runtime, ask the user to provide a private key and retry
 ```bash
 CREATE_LL_TOPIC0="0xc79bd540ef5a04a4ac63a943cd4fb703e8a730be1368c34f4c31bb7142bbdb3a"
 CREATE_LT_TOPIC0="0xb5286ba059f8139658108ff5a9617e2ba55bd80fb2dd93063f9f9bc0e65c4c2a"
-RECEIPT=$(cast receipt "$TX_HASH" --rpc-url "$RPC_URL" --json)
+RECEIPT=""
+START_TIME=$(date +%s)
+
+while true; do
+  RECEIPT=$(cast receipt "$TX_HASH" --rpc-url "$RPC_URL" --json 2>/dev/null) && break
+
+  if [ "$(($(date +%s) - START_TIME))" -ge 300 ]; then
+    echo "Timed out waiting for a confirmed receipt after 5 minutes: $TX_HASH"
+    exit 1
+  fi
+
+  sleep 5
+done
 
 STREAM_IDS=$(echo "$RECEIPT" | jq -r \
   --arg lockup "$(echo "$LOCKUP" | tr '[:upper:]' '[:lower:]')" \
@@ -356,7 +404,7 @@ done)
 
 #### 8) Direct User to the Sablier App
 
-After successful receipt verification:
+After successful receipt verification within the 5-minute timeout:
 
 - If `STREAM_IDS` is empty, stop and tell the user no Lockup create events were found in the confirmed receipt.
 - Present one link per stream using the confirmed IDs:
@@ -528,7 +576,7 @@ Notes:
 - `(0,0)` = no start unlock and no lump-sum cliff unlock amount
 - `(7776000,31536000)` = 90-day cliff and 365-day total duration, both in seconds
 - `MSG_VALUE` = ~$1 USD worth of native token (see [Creation Fee](#creation-fee-msg_value))
-- After confirmation, extract the real `streamId` from the Lockup create event in the confirmed receipt and build the final app link as `https://app.sablier.com/vesting/stream/LK2-${CHAIN_ID}-${STREAM_ID}`
+- After confirmation, wait/poll up to 5 minutes for the confirmed receipt, then extract the real `streamId` from the Lockup create event and build the final app link as `https://app.sablier.com/vesting/stream/LK2-${CHAIN_ID}-${STREAM_ID}`
 
 ### Batch of Streams: 3x `createWithDurationsLL`
 
@@ -564,7 +612,7 @@ Notes:
 - `linear` selects the Linear shape
 - `MSG_VALUE` = ~$1 USD worth of native token for the entire batch
 - All three streams use the same `SablierLockup` contract and the same `batch()` entrypoint
-- After confirmation, extract all `streamId` values from the confirmed receipt and build one final link per stream as `https://app.sablier.com/vesting/stream/LK2-${CHAIN_ID}-${STREAM_ID}`
+- After confirmation, wait/poll up to 5 minutes for the confirmed receipt, then extract all `streamId` values and build one final link per stream as `https://app.sablier.com/vesting/stream/LK2-${CHAIN_ID}-${STREAM_ID}`
 - For more than 50 streams, direct the user to the [Sablier UI](https://app.sablier.com)
 
 ## Supported Chains

@@ -54,6 +54,8 @@ If any of the following are missing or ambiguous from the user's input, use the 
 - Recipient address(es)
 - Vesting shape (when multiple shapes could fit the description)
 
+If the missing detail is the token address, use the `AskUserQuestion` tool to ask for the exact ERC-20 contract address and tell the user they can look it up on a blockchain explorer such as Etherscan.
+
 Do not guess or silently apply defaults for these parameters. Only proceed once all required inputs are confirmed.
 
 ### 4. Infer intent before selecting references

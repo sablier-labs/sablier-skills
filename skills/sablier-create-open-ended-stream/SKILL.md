@@ -1,5 +1,5 @@
 ---
-name: sablier-create-payment
+name: sablier-create-open-ended-stream
 disable-model-invocation: false
 user-invocable: true
 argument-hint: <chain_name> <token_address> <payment_details>

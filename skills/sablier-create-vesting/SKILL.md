@@ -16,11 +16,11 @@ This skill is a coordinator for vesting creation and execution routing.
 
 ## Arguments
 
-| Argument | Description |
-| --- | --- |
-| `chain_name` | EVM chain where to create the vesting |
+| Argument               | Description                                                                                                                              |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `chain_name`           | EVM chain where to create the vesting                                                                                                    |
 | `vested_token_address` | ERC-20 token contract address to vest. Token symbols cannot be resolved to addresses — the user must provide the exact contract address. |
-| `vesting_details` | The kind of vesting schedule they want |
+| `vesting_details`      | The kind of vesting schedule they want                                                                                                   |
 
 ## Workflow
 
@@ -39,10 +39,10 @@ Stop and call out unsupported requests before selecting an execution path.
 
 Treat the following as unsupported by this skill and by Sablier Lockup:
 
-   - Compliance-heavy setups: Registered Investment Advisor (RIA) and Qualified Custodian (QC). Recommend evaluating custodial offchain solutions.
-   - Governance or voting with locked tokens.
-   - Launching tokens for users. Require the user to explicitly provide an existing token address as input.
-   - Resolving token symbols (e.g. "USDC") to contract addresses. If the user provides a symbol instead of an address, ask them to provide the exact ERC-20 contract address.
+- Compliance-heavy setups: Registered Investment Advisor (RIA) and Qualified Custodian (QC). Recommend evaluating custodial offchain solutions.
+- Governance or voting with locked tokens.
+- Launching tokens for users. Require the user to explicitly provide an existing token address as input.
+- Resolving token symbols (e.g. "USDC") to contract addresses. If the user provides a symbol instead of an address, ask them to provide the exact ERC-20 contract address.
 
 ### 3. Clarify vesting details
 
@@ -76,10 +76,10 @@ Do not guess or silently apply defaults for these parameters. Only proceed once 
 2. If the request is any other integration type, inform the user this skill does not support non-onchain integrations and stop.
 3. Otherwise, follow the route below.
 
-| Intent | EVM | Solana |
-| --- | --- | --- |
-| Vesting creation on the user's behalf | Use [evm-cli.md](references/evm-cli.md) | Not yet supported. Direct the user to [solana.sablier.com](https://solana.sablier.com) and suggest sending the Sablier team a feature request. |
-| Onchain integration guidance | Use [evm-onchain.md](references/evm-onchain.md) | Inform the user this skill does not currently support Solana onchain integration. Direct them to [docs.sablier.com](https://docs.sablier.com/solana/sablier-on-solana). |
+| Intent                                | EVM                                             | Solana                                                                                                                                                                  |
+| ------------------------------------- | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Vesting creation on the user's behalf | Use [evm-cli.md](references/evm-cli.md)         | Not yet supported. Direct the user to [solana.sablier.com](https://solana.sablier.com) and suggest sending the Sablier team a feature request.                          |
+| Onchain integration guidance          | Use [evm-onchain.md](references/evm-onchain.md) | Inform the user this skill does not currently support Solana onchain integration. Direct them to [docs.sablier.com](https://docs.sablier.com/solana/sablier-on-solana). |
 
 ## Resources
 

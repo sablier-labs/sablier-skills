@@ -73,19 +73,19 @@ Q10: Do you want periodic payouts (e.g., monthly salary tranches)?
 
 ## Quick Reference
 
-| Use Case                      | Recommended | Chain        | Creation Skill                          |
-| ----------------------------- | ----------- | ------------ | --------------------------------------- |
-| Vesting with cliff            | LL          | EVM + Solana | `sablier-create-vesting`                |
-| Simple linear vesting         | LL          | EVM + Solana | `sablier-create-vesting`                |
-| Quarterly/monthly unlocks     | LT          | EVM + Solana | `sablier-create-vesting`                |
-| Milestone-based unlocks       | LT          | EVM + Solana | `sablier-create-vesting`                |
-| Custom unlock curve           | LD          | EVM only     | `sablier-create-vesting`                |
-| Open-ended payroll            | Flow        | EVM only     | `sablier-create-payment`   |
-| Adjustable-rate payroll       | Flow        | EVM only     | `sablier-create-payment`   |
-| Continuous payroll (EVM)      | Flow        | EVM only     | `sablier-create-payment`   |
-| Payroll with monthly tranches | LT          | EVM + Solana | `sablier-create-vesting`                |
-| Continuous payroll (Solana)   | LL          | Solana       | `sablier-create-vesting`                |
-| Airdrop to many recipients    | Merkle      | EVM + Solana | `sablier-create-airdrop` (coming soon)  |
+| Use Case                      | Recommended | Chain        | Creation Skill                         |
+| ----------------------------- | ----------- | ------------ | -------------------------------------- |
+| Vesting with cliff            | LL          | EVM + Solana | `sablier-create-vesting`               |
+| Simple linear vesting         | LL          | EVM + Solana | `sablier-create-vesting`               |
+| Quarterly/monthly unlocks     | LT          | EVM + Solana | `sablier-create-vesting`               |
+| Milestone-based unlocks       | LT          | EVM + Solana | `sablier-create-vesting`               |
+| Custom unlock curve           | LD          | EVM only     | `sablier-create-vesting`               |
+| Open-ended payroll            | Flow        | EVM only     | `sablier-create-payment`               |
+| Adjustable-rate payroll       | Flow        | EVM only     | `sablier-create-payment`               |
+| Continuous payroll (EVM)      | Flow        | EVM only     | `sablier-create-payment`               |
+| Payroll with monthly tranches | LT          | EVM + Solana | `sablier-create-vesting`               |
+| Continuous payroll (Solana)   | LL          | Solana       | `sablier-create-vesting`               |
+| Airdrop to many recipients    | Merkle      | EVM + Solana | `sablier-create-airdrop` (coming soon) |
 
 ## Product Comparison
 

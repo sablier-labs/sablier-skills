@@ -14,7 +14,7 @@ Use this sequence for every state-changing operation:
 4. Require explicit user confirmation.
 5. Broadcast with `cast send`.
 6. Verify the receipt and derive the created stream ID or IDs from Lockup create events.
-7. If the chain is supported in the Sablier UI, direct the user to the stream page on [app.sablier.com](https://app.sablier.com). Otherwise, present the receipt summary and explorer link.
+7. Direct the user to the stream page on [app.sablier.com](https://app.sablier.com).
 
 If ERC-20 allowance is insufficient, execute an `approve` transaction first, then resume at step 2.
 
@@ -67,12 +67,12 @@ Choose the transaction shape in this order before building calldata.
 
 Infer the creation mode from the user's request:
 
-| Signal | Mode |
-| --- | --- |
-| One recipient, one stream | **Single Stream** |
+| Signal                                  | Mode                 |
+| --------------------------------------- | -------------------- |
+| One recipient, one stream               | **Single Stream**    |
 | Multiple recipients or multiple streams | **Batch of Streams** |
-| "create streams for 5 recipients" | **Batch of Streams** |
-| "create a stream for Alice" | **Single Stream** |
+| "create streams for 5 recipients"       | **Batch of Streams** |
+| "create a stream for Alice"             | **Single Stream**    |
 
 - If ambiguous, ask the user to clarify.
 - Batch requests exceeding **50 streams** are not supported by this skill. Direct the user to the [Sablier UI](https://app.sablier.com) instead.
@@ -124,22 +124,22 @@ The creation fee is approximately **~$1 USD** worth of the chain's native asset.
 
 Look up the `MSG_VALUE` for the chain's native asset from this table:
 
-| Native Asset | ~Amount | MSG_VALUE (wei) |
-| --- | --- | --- |
-| ETH | 0.0005 ETH | `500000000000000` |
-| AVAX | 0.11 AVAX | `110000000000000000` |
-| BERA | 1.9 BERA | `1900000000000000000` |
-| BNB | 0.0016 BNB | `1600000000000000` |
-| CHZ | 25 CHZ | `25000000000000000000` |
-| CORE | 12.5 CORE | `12500000000000000000` |
-| HYPE | 0.032 HYPE | `32000000000000000` |
-| MON | 50 MON | `50000000000000000000` |
-| POL | 10 POL | `10000000000000000000` |
-| S | 25 S | `25000000000000000000` |
-| SEI | 14 SEI | `14000000000000000000` |
-| WATT | 0 WATT | `0` |
-| xDAI | 1 xDAI | `1000000000000000000` |
-| XDC | 29 XDC | `29000000000000000000` |
+| Native Asset | ~Amount    | MSG_VALUE (wei)        |
+| ------------ | ---------- | ---------------------- |
+| ETH          | 0.0005 ETH | `500000000000000`      |
+| AVAX         | 0.11 AVAX  | `110000000000000000`   |
+| BERA         | 1.9 BERA   | `1900000000000000000`  |
+| BNB          | 0.0016 BNB | `1600000000000000`     |
+| CHZ          | 25 CHZ     | `25000000000000000000` |
+| CORE         | 12.5 CORE  | `12500000000000000000` |
+| HYPE         | 0.032 HYPE | `32000000000000000`    |
+| MON          | 50 MON     | `50000000000000000000` |
+| POL          | 10 POL     | `10000000000000000000` |
+| S            | 25 S       | `25000000000000000000` |
+| SEI          | 14 SEI     | `14000000000000000000` |
+| WATT         | 0 WATT     | `0`                    |
+| xDAI         | 1 xDAI     | `1000000000000000000`  |
+| XDC          | 29 XDC     | `29000000000000000000` |
 
 > These values are approximate as of March 2026. If a value seems outdated, use web search to find the current price and recalculate as `cast to-wei $(echo "scale=18; 1 / $PRICE" | bc) ether`.
 
@@ -153,7 +153,7 @@ For stream creation:
 1. **ERC-20 allowance.** Check `allowance(owner, lockup)`. The required allowance depends on mode:
    - **Single Stream:** `DEPOSIT_AMOUNT`
    - **Batch of Streams:** sum of `DEPOSIT_AMOUNT` across all streams
-   If allowance is below the required total, send an `approve` transaction to raise allowance before attempting stream creation.
+     If allowance is below the required total, send an `approve` transaction to raise allowance before attempting stream creation.
 2. **ERC-20 token balance.** Check `balanceOf(owner)` is at least the total deposit amount (single-stream deposit or the sum of all batch deposits). If balance is insufficient, stop execution and inform the user they need more tokens (for example, purchase via Uniswap) before continuing.
 
 ### Native Gas Balance for Every Transaction
@@ -281,8 +281,7 @@ STREAM_ID=$(printf '%s\n' "$STREAM_IDS" | sed -n '1p')
 After successful receipt verification:
 
 - If `STREAM_ID` is empty, stop and tell the user no Lockup create event was found in the confirmed receipt.
-- If `CHAIN_ID` is `34443` (Mode), do not promise an app link. Present the `TX_HASH`, `STREAM_ID`, and `https://modescan.io/tx/${TX_HASH}` instead.
-- Otherwise, present the direct link to the stream:
+- Present the direct link to the stream:
 
 ```
 https://app.sablier.com/vesting/stream/LK2-${CHAIN_ID}-${STREAM_ID}
@@ -357,8 +356,7 @@ done)
 After successful receipt verification:
 
 - If `STREAM_IDS` is empty, stop and tell the user no Lockup create events were found in the confirmed receipt.
-- If `CHAIN_ID` is `34443` (Mode), do not promise app links. Present the `TX_HASH`, all extracted stream IDs, and `https://modescan.io/tx/${TX_HASH}` instead.
-- Otherwise, present one link per stream using the confirmed IDs:
+- Present one link per stream using the confirmed IDs:
 
 ```bash
 printf '%s\n' "$STREAM_IDS" | while read -r STREAM_ID; do
@@ -372,13 +370,13 @@ Maps each vesting shape to the correct `SablierLockup` function and calldata enc
 
 ### Shape-to-Function Mapping
 
-| Shape | `Durations` Variant | `Timestamps` Variant | `shape` String |
-| --- | --- | --- | --- |
-| Linear | `createWithDurationsLL` | `createWithTimestampsLL` | `"linear"` |
-| Cliff | `createWithDurationsLL` | `createWithTimestampsLL` | `"cliff"` |
+| Shape           | `Durations` Variant     | `Timestamps` Variant     | `shape` String      |
+| --------------- | ----------------------- | ------------------------ | ------------------- |
+| Linear          | `createWithDurationsLL` | `createWithTimestampsLL` | `"linear"`          |
+| Cliff           | `createWithDurationsLL` | `createWithTimestampsLL` | `"cliff"`           |
 | Unlock in Steps | `createWithDurationsLT` | `createWithTimestampsLT` | `"tranchedStepper"` |
 | Monthly Unlocks | `createWithDurationsLT` | `createWithTimestampsLT` | `"tranchedMonthly"` |
-| Timelock | `createWithDurationsLL` | `createWithTimestampsLL` | `"linearTimelock"` |
+| Timelock        | `createWithDurationsLL` | `createWithTimestampsLL` | `"linearTimelock"`  |
 
 Use `Durations` variants when the stream should start immediately upon confirmation. Use `Timestamps` variants when the user provides specific start or unlock times.
 
@@ -402,11 +400,11 @@ createWithDurationsLL(
 
 **Shape-specific encoding:**
 
-| Shape | `unlockAmounts` | `durations` |
-| --- | --- | --- |
-| Linear | `(0, 0)` | `(0, totalDuration)` - no cliff |
-| Cliff | `(0, cliffUnlockAmount)` | `(cliffDuration, totalDuration)` |
-| Timelock | `(0, 0)` | `(0, lockDuration)` - entire amount unlocks at end |
+| Shape    | `unlockAmounts`          | `durations`                                        |
+| -------- | ------------------------ | -------------------------------------------------- |
+| Linear   | `(0, 0)`                 | `(0, totalDuration)` - no cliff                    |
+| Cliff    | `(0, cliffUnlockAmount)` | `(cliffDuration, totalDuration)`                   |
+| Timelock | `(0, 0)`                 | `(0, lockDuration)` - entire amount unlocks at end |
 
 ### `createWithTimestampsLL`
 
@@ -428,11 +426,11 @@ createWithTimestampsLL(
 
 **Shape-specific encoding:**
 
-| Shape | `unlockAmounts` | `cliffTime` |
-| --- | --- | --- |
-| Linear | `(0, 0)` | `0` |
-| Cliff | `(0, cliffUnlockAmount)` | cliff Unix timestamp |
-| Timelock | `(0, 0)` | `0` |
+| Shape    | `unlockAmounts`          | `cliffTime`          |
+| -------- | ------------------------ | -------------------- |
+| Linear   | `(0, 0)`                 | `0`                  |
+| Cliff    | `(0, cliffUnlockAmount)` | cliff Unix timestamp |
+| Timelock | `(0, 0)`                 | `0`                  |
 
 ### `createWithDurationsLT`
 
@@ -452,10 +450,10 @@ createWithDurationsLT(
 
 **Shape-specific encoding:**
 
-| Shape | Tranche Construction |
-| --- | --- |
+| Shape           | Tranche Construction                                                                 |
+| --------------- | ------------------------------------------------------------------------------------ |
 | Unlock in Steps | Equal amounts, equal durations (for example, 4 tranches of 250 tokens every 90 days) |
-| Monthly Unlocks | Equal amounts, 30-day durations (use 2592000 seconds per tranche) |
+| Monthly Unlocks | Equal amounts, 30-day durations (use 2592000 seconds per tranche)                    |
 
 ### `createWithTimestampsLT`
 
@@ -475,9 +473,9 @@ createWithTimestampsLT(
 
 **Shape-specific encoding:**
 
-| Shape | Tranche Construction |
-| --- | --- |
-| Unlock in Steps | Equal amounts at equally spaced timestamps |
+| Shape           | Tranche Construction                                                           |
+| --------------- | ------------------------------------------------------------------------------ |
+| Unlock in Steps | Equal amounts at equally spaced timestamps                                     |
 | Monthly Unlocks | Equal amounts at monthly timestamps (tranche N unlocks at start + N × 30 days) |
 
 ### `batch`
@@ -571,37 +569,36 @@ Use this registry to resolve chain metadata, RPC endpoints, native asset pricing
 UI support note:
 
 - The Lockup v3.0 UI alias is `LK2`, so supported vesting links use `https://app.sablier.com/vesting/stream/LK2-${CHAIN_ID}-${STREAM_ID}`.
-- Mode is deployed onchain but not currently supported in the Sablier UI. For Mode, report the confirmed `streamId` values, the transaction hash, and `https://modescan.io/tx/${TX_HASH}` instead of generating app links.
 
-| Chain | Chain ID | Native Asset | SablierLockup | RPC URL |
-| --- | --- | --- | --- | --- |
-| Ethereum | `1` | ETH | `0xcF8ce57fa442ba50aCbC57147a62aD03873FfA73` | `https://ethereum-rpc.publicnode.com` |
-| Abstract | `2741` | ETH | `0x293d8d192C0C93225FF6bBE7415a56B57379bbA3` | `https://api.mainnet.abs.xyz` |
-| Arbitrum | `42161` | ETH | `0xF12AbfB041b5064b839Ca56638cDB62fEA712Db5` | `https://arb1.arbitrum.io/rpc` |
-| Avalanche | `43114` | AVAX | `0x7e146250Ed5CCCC6Ada924D456947556902acaFD` | `https://api.avax.network/ext/bc/C/rpc` |
-| Base | `8453` | ETH | `0xe261b366f231b12fcb58d6bbd71e57faee82431d` | `https://mainnet.base.org` |
-| Berachain | `80094` | BERA | `0xC37B51a3c3Be55f0B34Fbd8Bd1F30cFF6d251408` | `https://rpc.berachain.com` |
-| Blast | `81457` | ETH | `0xcD16d89cc79Ab0b52717A46b8A3F73E61014c7dc` | `https://rpc.blast.io` |
-| BNB Chain | `56` | BNB | `0x06bd1Ec1d80acc45ba332f79B08d2d9e24240C74` | `https://bsc-dataseed1.bnbchain.org` |
-| Chiliz | `88888` | CHZ | `0x957a54aC691893B20c705e0b2EecbDDF5220d019` | `https://rpc.chiliz.com` |
-| Core Dao | `1116` | CORE | `0x01Fed2aB51A830a3AF3AE1AB817dF1bA4F152bB0` | `https://rpc.coredao.org` |
-| Denergy | `369369` | WATT | `0x9f5d28C8ed7F09e65519C1f6f394e523524cA38F` | `https://rpc.d.energy` |
-| Gnosis | `100` | xDAI | `0x87f87Eb0b59421D1b2Df7301037e923932176681` | `https://rpc.gnosischain.com` |
-| HyperEVM | `999` | HYPE | `0x50ff828e66612A4D1F7141936F2B4078C7356329` | `https://rpc.hyperliquid.xyz/evm` |
-| Lightlink | `1890` | ETH | `0xA4f1f4a5C55b5d9372CBB29112b14e1912A23d9D` | `https://replicator.phoenix.lightlink.io/rpc/v1` |
-| Linea Mainnet | `59144` | ETH | `0xc853DB30a908dC1b655bbd4A8B9d5DB8588C13c8` | `https://rpc.linea.build` |
-| Mode | `34443` | ETH | `0x9513CE572D4f4AAc1Dd493bcd50866235D1c698d` | `https://mainnet.mode.network` |
-| Monad | `143` | MON | `0x003F5393F4836f710d492AD98D89F5BFCCF1C962` | `https://rpc.monad.xyz` |
-| Morph | `2818` | ETH | `0xE646D9A037c6B62e4d417592A10f57e77f007a27` | `https://rpc.morphl2.io` |
-| OP Mainnet | `10` | ETH | `0xe2620fB20fC9De61CD207d921691F4eE9d0fffd0` | `https://mainnet.optimism.io` |
-| Polygon | `137` | POL | `0x1E901b0E05A78C011D6D4cfFdBdb28a42A1c32EF` | `https://polygon-bor-rpc.publicnode.com` |
-| Scroll | `534352` | ETH | `0xcb60a39942CD5D1c2a1C8aBBEd99C43A73dF3f8d` | `https://rpc.scroll.io` |
-| Sei Network | `1329` | SEI | `0x1d96e9d05f6910d22876177299261290537cfBBc` | `https://evm-rpc.sei-apis.com` |
-| Sonic | `146` | S | `0x763Cfb7DF1D1BFe50e35E295688b3Df789D2feBB` | `https://rpc.soniclabs.com` |
-| Superseed | `5330` | ETH | `0x2F1c6AD6306Bd0200D55b59AD54d4b44067D00E6` | `https://mainnet.superseed.xyz` |
-| Unichain | `130` | ETH | `0xfFb540fC132dCefb0Fdef96ef63FE2f2F1BD7CFd` | `https://mainnet.unichain.org` |
-| XDC | `50` | XDC | `0x2266901B1EcF499b4c91B6cBeA8e06700cFbde1e` | `https://rpc.xinfin.network` |
-| ZKsync Era | `324` | ETH | `0xC07E338Ce1aEd183A8b3c55f980548f5E463b5c5` | `https://mainnet.era.zksync.io` |
-| Sepolia | `11155111` | ETH | `0x6b0307b4338f2963A62106028E3B074C2c0510DA` | `https://ethereum-sepolia-rpc.publicnode.com` |
+| Chain         | Chain ID   | Native Asset | SablierLockup                                | RPC URL                                          |
+| ------------- | ---------- | ------------ | -------------------------------------------- | ------------------------------------------------ |
+| Ethereum      | `1`        | ETH          | `0xcF8ce57fa442ba50aCbC57147a62aD03873FfA73` | `https://ethereum-rpc.publicnode.com`            |
+| Abstract      | `2741`     | ETH          | `0x293d8d192C0C93225FF6bBE7415a56B57379bbA3` | `https://api.mainnet.abs.xyz`                    |
+| Arbitrum      | `42161`    | ETH          | `0xF12AbfB041b5064b839Ca56638cDB62fEA712Db5` | `https://arb1.arbitrum.io/rpc`                   |
+| Avalanche     | `43114`    | AVAX         | `0x7e146250Ed5CCCC6Ada924D456947556902acaFD` | `https://api.avax.network/ext/bc/C/rpc`          |
+| Base          | `8453`     | ETH          | `0xe261b366f231b12fcb58d6bbd71e57faee82431d` | `https://mainnet.base.org`                       |
+| Berachain     | `80094`    | BERA         | `0xC37B51a3c3Be55f0B34Fbd8Bd1F30cFF6d251408` | `https://rpc.berachain.com`                      |
+| Blast         | `81457`    | ETH          | `0xcD16d89cc79Ab0b52717A46b8A3F73E61014c7dc` | `https://rpc.blast.io`                           |
+| BNB Chain     | `56`       | BNB          | `0x06bd1Ec1d80acc45ba332f79B08d2d9e24240C74` | `https://bsc-dataseed1.bnbchain.org`             |
+| Chiliz        | `88888`    | CHZ          | `0x957a54aC691893B20c705e0b2EecbDDF5220d019` | `https://rpc.chiliz.com`                         |
+| Core Dao      | `1116`     | CORE         | `0x01Fed2aB51A830a3AF3AE1AB817dF1bA4F152bB0` | `https://rpc.coredao.org`                        |
+| Denergy       | `369369`   | WATT         | `0x9f5d28C8ed7F09e65519C1f6f394e523524cA38F` | `https://rpc.d.energy`                           |
+| Gnosis        | `100`      | xDAI         | `0x87f87Eb0b59421D1b2Df7301037e923932176681` | `https://rpc.gnosischain.com`                    |
+| HyperEVM      | `999`      | HYPE         | `0x50ff828e66612A4D1F7141936F2B4078C7356329` | `https://rpc.hyperliquid.xyz/evm`                |
+| Lightlink     | `1890`     | ETH          | `0xA4f1f4a5C55b5d9372CBB29112b14e1912A23d9D` | `https://replicator.phoenix.lightlink.io/rpc/v1` |
+| Linea Mainnet | `59144`    | ETH          | `0xc853DB30a908dC1b655bbd4A8B9d5DB8588C13c8` | `https://rpc.linea.build`                        |
+| Mode          | `34443`    | ETH          | `0x9513CE572D4f4AAc1Dd493bcd50866235D1c698d` | `https://mainnet.mode.network`                   |
+| Monad         | `143`      | MON          | `0x003F5393F4836f710d492AD98D89F5BFCCF1C962` | `https://rpc.monad.xyz`                          |
+| Morph         | `2818`     | ETH          | `0xE646D9A037c6B62e4d417592A10f57e77f007a27` | `https://rpc.morphl2.io`                         |
+| OP Mainnet    | `10`       | ETH          | `0xe2620fB20fC9De61CD207d921691F4eE9d0fffd0` | `https://mainnet.optimism.io`                    |
+| Polygon       | `137`      | POL          | `0x1E901b0E05A78C011D6D4cfFdBdb28a42A1c32EF` | `https://polygon-bor-rpc.publicnode.com`         |
+| Scroll        | `534352`   | ETH          | `0xcb60a39942CD5D1c2a1C8aBBEd99C43A73dF3f8d` | `https://rpc.scroll.io`                          |
+| Sei Network   | `1329`     | SEI          | `0x1d96e9d05f6910d22876177299261290537cfBBc` | `https://evm-rpc.sei-apis.com`                   |
+| Sonic         | `146`      | S            | `0x763Cfb7DF1D1BFe50e35E295688b3Df789D2feBB` | `https://rpc.soniclabs.com`                      |
+| Superseed     | `5330`     | ETH          | `0x2F1c6AD6306Bd0200D55b59AD54d4b44067D00E6` | `https://mainnet.superseed.xyz`                  |
+| Unichain      | `130`      | ETH          | `0xfFb540fC132dCefb0Fdef96ef63FE2f2F1BD7CFd` | `https://mainnet.unichain.org`                   |
+| XDC           | `50`       | XDC          | `0x2266901B1EcF499b4c91B6cBeA8e06700cFbde1e` | `https://rpc.xinfin.network`                     |
+| ZKsync Era    | `324`      | ETH          | `0xC07E338Ce1aEd183A8b3c55f980548f5E463b5c5` | `https://mainnet.era.zksync.io`                  |
+| Sepolia       | `11155111` | ETH          | `0x6b0307b4338f2963A62106028E3B074C2c0510DA` | `https://ethereum-sepolia-rpc.publicnode.com`    |
 
 Ethereum can also be referred to as "Mainnet".

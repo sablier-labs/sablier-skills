@@ -16,11 +16,11 @@ This skill is a coordinator for payment stream creation and execution routing.
 
 ## Arguments
 
-| Argument | Description |
-| --- | --- |
-| `chain_name` | EVM chain where to create the payment stream |
-| `token_address` | ERC-20 token contract address to stream. Token symbols cannot be resolved to addresses — the user must provide the exact contract address. |
-| `payment_details` | The streaming rate, recipient, and funding preference |
+| Argument          | Description                                                                                                                                |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `chain_name`      | EVM chain where to create the payment stream                                                                                               |
+| `token_address`   | ERC-20 token contract address to stream. Token symbols cannot be resolved to addresses — the user must provide the exact contract address. |
+| `payment_details` | The streaming rate, recipient, and funding preference                                                                                      |
 
 ## Workflow
 
@@ -39,11 +39,11 @@ Stop and call out unsupported requests before selecting an execution path.
 
 Treat the following as unsupported by this skill and by Sablier Flow:
 
-   - Streaming native tokens (ETH, BNB, AVAX, etc.). Only ERC-20 tokens can be streamed. If the user wants to stream a native token, inform them they must wrap it first (e.g. WETH) and provide the wrapped token contract address.
-   - Tokens with more than 18 decimals. The Flow contract requires token decimals ≤ 18.
-   - Fixed-schedule vesting with upfront deposit and defined end date. Route to `sablier-create-vesting`.
-   - Launching tokens for users. Require the user to explicitly provide an existing token address as input.
-   - Resolving token symbols (e.g. "USDC") to contract addresses. If the user provides a symbol instead of an address, ask them to provide the exact ERC-20 contract address.
+- Streaming native tokens (ETH, BNB, AVAX, etc.). Only ERC-20 tokens can be streamed. If the user wants to stream a native token, inform them they must wrap it first (e.g. WETH) and provide the wrapped token contract address.
+- Tokens with more than 18 decimals. The Flow contract requires token decimals ≤ 18.
+- Fixed-schedule vesting with upfront deposit and defined end date. Route to `sablier-create-vesting`.
+- Launching tokens for users. Require the user to explicitly provide an existing token address as input.
+- Resolving token symbols (e.g. "USDC") to contract addresses. If the user provides a symbol instead of an address, ask them to provide the exact ERC-20 contract address.
 
 ### 3. Clarify payment details
 
@@ -86,10 +86,10 @@ If the user explicitly requests a streaming amount `"per month"`:
 2. If the request is any other integration type, inform the user this skill does not support non-onchain integrations and stop.
 3. Otherwise, follow the route below.
 
-| Intent | EVM | Solana |
-| --- | --- | --- |
-| Payment stream creation on the user's behalf | Use [evm-cli.md](references/evm-cli.md) | Not available. Sablier Flow is EVM-only. |
-| Onchain integration guidance | Use [evm-onchain.md](references/evm-onchain.md) | Not available. Sablier Flow is EVM-only. |
+| Intent                                       | EVM                                             | Solana                                   |
+| -------------------------------------------- | ----------------------------------------------- | ---------------------------------------- |
+| Payment stream creation on the user's behalf | Use [evm-cli.md](references/evm-cli.md)         | Not available. Sablier Flow is EVM-only. |
+| Onchain integration guidance                 | Use [evm-onchain.md](references/evm-onchain.md) | Not available. Sablier Flow is EVM-only. |
 
 ## Resources
 

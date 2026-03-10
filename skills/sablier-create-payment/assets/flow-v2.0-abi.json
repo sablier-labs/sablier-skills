@@ -46,5 +46,20 @@
     "outputs": [{ "internalType": "uint256", "name": "streamId", "type": "uint256" }],
     "stateMutability": "payable",
     "type": "function"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "internalType": "uint256", "name": "streamId", "type": "uint256" },
+      { "indexed": false, "internalType": "address", "name": "creator", "type": "address" },
+      { "indexed": true, "internalType": "address", "name": "sender", "type": "address" },
+      { "indexed": true, "internalType": "address", "name": "recipient", "type": "address" },
+      { "indexed": false, "internalType": "UD21x18", "name": "ratePerSecond", "type": "uint128" },
+      { "indexed": false, "internalType": "uint40", "name": "snapshotTime", "type": "uint40" },
+      { "indexed": true, "internalType": "contract IERC20", "name": "token", "type": "address" },
+      { "indexed": false, "internalType": "bool", "name": "transferable", "type": "bool" }
+    ],
+    "name": "CreateFlowStream",
+    "type": "event"
   }
 ]

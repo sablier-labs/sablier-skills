@@ -14,7 +14,7 @@ Use this sequence for every state-changing operation:
 4. Require explicit user confirmation.
 5. Broadcast with `cast send`.
 6. Verify the receipt and derive the created stream ID or IDs from `CreateFlowStream` logs.
-7. If the chain is supported in the Sablier UI, direct the user to the stream page on [app.sablier.com](https://app.sablier.com). Otherwise, present the receipt summary and explorer link.
+7. Direct the user to the stream page on [app.sablier.com](https://app.sablier.com).
 
 If ERC-20 allowance is insufficient (for `createAndDeposit`), execute an `approve` transaction first, then resume at step 2.
 
@@ -83,14 +83,12 @@ Choose the transaction parameters in this order before building calldata.
 
 Infer the creation mode from the user's request:
 
-
 | Signal                                  | Mode                 |
 | --------------------------------------- | -------------------- |
 | One recipient, one stream               | **Single Stream**    |
 | Multiple recipients or multiple streams | **Batch of Streams** |
 | "create streams for 5 recipients"       | **Batch of Streams** |
 | "create a stream for Alice"             | **Single Stream**    |
-
 
 - If ambiguous, ask the user to clarify.
 - Batch requests exceeding **50 streams** are not supported by this skill. Direct the user to the [Sablier UI](https://app.sablier.com) instead.
@@ -99,12 +97,10 @@ Infer the creation mode from the user's request:
 
 Infer whether to fund the stream upfront:
 
-
 | Signal                                                                                   | Function                                              |
 | ---------------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| "create a stream", "start streaming", no mention of deposit                              | `**create`** — stream starts with zero balance        |
+| "create a stream", "start streaming", no mention of deposit                              | `**create`\*\* — stream starts with zero balance      |
 | "create and deposit", "fund the stream", "deposit tokens", mentions an amount to deposit | `**createAndDeposit**` — stream is funded immediately |
-
 
 - If the user wants to deposit tokens upfront but hasn't specified an amount, ask them to provide the deposit amount.
 - If ambiguous, ask the user whether they want to fund the stream at creation or deposit later.
@@ -121,7 +117,6 @@ ratePerSecond = (tokensPerPeriod * 1e18) / secondsInPeriod
 
 **Common period conversions:**
 
-
 | Period           | Seconds    |
 | ---------------- | ---------- |
 | Per hour         | `3600`     |
@@ -129,7 +124,6 @@ ratePerSecond = (tokensPerPeriod * 1e18) / secondsInPeriod
 | Per week         | `604800`   |
 | Per 30-day month | `2592000`  |
 | Per 365-day year | `31536000` |
-
 
 **Example:** Stream 1,000 USDC per 30-day month:
 
@@ -180,7 +174,6 @@ The creation fee is approximately **~$1 USD** worth of the chain's native asset.
 
 Look up the `MSG_VALUE` for the chain's native asset from this table:
 
-
 | Native Asset | ~Amount    | MSG_VALUE (wei)        |
 | ------------ | ---------- | ---------------------- |
 | ETH          | 0.0005 ETH | `500000000000000`      |
@@ -198,7 +191,6 @@ Look up the `MSG_VALUE` for the chain's native asset from this table:
 | xDAI         | 1 xDAI     | `1000000000000000000`  |
 | XDC          | 29 XDC     | `29000000000000000000` |
 
-
 > These values are approximate as of March 2026. If a value seems outdated, use web search to find the current price and recalculate as `cast to-wei $(echo "scale=18; 1 / $PRICE" | bc) ether`.
 
 - Use the same fee for both **Single Stream** and **Batch of Streams** transactions.
@@ -209,9 +201,11 @@ Look up the `MSG_VALUE` for the chain's native asset from this table:
 For `createAndDeposit` only:
 
 1. **ERC-20 allowance.** Check `allowance(owner, flow)`. The required allowance depends on mode:
-  - **Single Stream:** `DEPOSIT_AMOUNT`
-  - **Batch of Streams:** sum of `DEPOSIT_AMOUNT` across all streams
-   If allowance is below the required total, send an `approve` transaction to raise allowance before attempting stream creation.
+
+- **Single Stream:** `DEPOSIT_AMOUNT`
+- **Batch of Streams:** sum of `DEPOSIT_AMOUNT` across all streams
+  If allowance is below the required total, send an `approve` transaction to raise allowance before attempting stream creation.
+
 2. **ERC-20 token balance.** Check `balanceOf(owner)` is at least the total deposit amount. If balance is insufficient, stop execution and inform the user they need more tokens (for example, purchase via Uniswap) before continuing.
 
 For `create` (no upfront deposit): skip allowance and token balance checks — no tokens are transferred at creation time.
@@ -342,8 +336,7 @@ STREAM_ID=$(printf '%s\n' "$STREAM_IDS" | sed -n '1p')
 After successful receipt verification:
 
 - If `STREAM_ID` is empty, stop and tell the user no `CreateFlowStream` event was found in the confirmed receipt.
-- If `CHAIN_ID` is `34443` (Mode), do not promise an app link. Present the `TX_HASH`, `STREAM_ID`, and `https://modescan.io/tx/${TX_HASH}` instead.
-- Otherwise, present the direct link to the stream:
+- Present the direct link to the stream:
 
 ```
 https://app.sablier.com/payments/stream/FL3-${CHAIN_ID}-${STREAM_ID}
@@ -419,8 +412,7 @@ done)
 After successful receipt verification:
 
 - If `STREAM_IDS` is empty, stop and tell the user no `CreateFlowStream` events were found in the confirmed receipt.
-- If `CHAIN_ID` is `34443` (Mode), do not promise app links. Present the `TX_HASH`, all extracted stream IDs, and `https://modescan.io/tx/${TX_HASH}` instead.
-- Otherwise, present one link per stream using the confirmed IDs:
+- Present one link per stream using the confirmed IDs:
 
 ```bash
 printf '%s\n' "$STREAM_IDS" | while read -r STREAM_ID; do
@@ -434,13 +426,11 @@ Maps each creation function to the correct `SablierFlow` calldata encoding. Refe
 
 ### Function-to-Use-Case Mapping
 
-
 | Function           | Use Case                                                  |
 | ------------------ | --------------------------------------------------------- |
 | `create`           | Stream without upfront deposit — anyone can deposit later |
 | `createAndDeposit` | Stream with immediate funding in a single transaction     |
 | `batch`            | Multiple streams in a single transaction                  |
-
 
 ### `create`
 
@@ -485,7 +475,7 @@ createAndDeposit(
 **Arguments:**
 
 1–6. Same as `create` above.
-7. **amount** - initial deposit in the token's base units (e.g. `1000000000` for 1000 USDC with 6 decimals). Must be > 0.
+7\. **amount** - initial deposit in the token's base units (e.g. `1000000000` for 1000 USDC with 6 decimals). Must be > 0.
 
 ### `batch`
 
@@ -522,7 +512,6 @@ ratePerSecond = (tokensPerPeriod * 1e18) / secondsInPeriod
 
 **Common rate examples:**
 
-
 | Desired Rate        | Calculation                  | `ratePerSecond` Value     |
 | ------------------- | ---------------------------- | ------------------------- |
 | 1 token/second      | `1 * 1e18`                   | `1000000000000000000`     |
@@ -531,7 +520,6 @@ ratePerSecond = (tokensPerPeriod * 1e18) / secondsInPeriod
 | 5,000 tokens/month  | `5000 * 1e18 / 2_592_000`    | `≈ 1_929_012_345_679_012` |
 | 10,000 tokens/year  | `10000 * 1e18 / 31_536_000`  | `≈ 317_097_919_837_645`   |
 | 120,000 tokens/year | `120000 * 1e18 / 31_536_000` | `≈ 3_805_175_038_051_750` |
-
 
 ## Worked Examples
 
@@ -651,8 +639,6 @@ Use this registry to resolve chain metadata, RPC endpoints, and `SablierFlow` co
 UI support note:
 
 - The Flow v2.0 UI alias is `FL3`, so supported payment links use `https://app.sablier.com/payments/stream/FL3-${CHAIN_ID}-${STREAM_ID}`.
-- Mode is deployed onchain but not currently supported in the Sablier UI. For Mode, report the confirmed `streamId` values, the transaction hash, and `https://modescan.io/tx/${TX_HASH}` instead of generating app links.
-
 
 | Chain         | Chain ID   | Native Asset | SablierFlow                                  | RPC URL                                          |
 | ------------- | ---------- | ------------ | -------------------------------------------- | ------------------------------------------------ |
@@ -684,6 +670,5 @@ UI support note:
 | XDC           | `50`       | XDC          | `0x3F00b8334EBE2A85875D1F8b50a43a12db67ACAD` | `https://rpc.xinfin.network`                     |
 | ZKsync Era    | `324`      | ETH          | `0xa7f02e692973b6315eaca7fb4285ad2536a89cd0` | `https://mainnet.era.zksync.io`                  |
 | Sepolia       | `11155111` | ETH          | `0xde489096eC9C718358c52a8BBe4ffD74857356e9` | `https://ethereum-sepolia-rpc.publicnode.com`    |
-
 
 Ethereum can also be referred to as "Mainnet".

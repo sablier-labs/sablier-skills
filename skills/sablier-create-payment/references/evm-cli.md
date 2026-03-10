@@ -2,8 +2,6 @@
 
 ## Overview
 
-Use this reference when the user wants the agent to execute EVM transactions on their behalf, such as creating Sablier Flow payment streams directly from the terminal.
-
 This guide is runbook-first: plan the stream, run preflight checks, preview the transaction, require explicit confirmation, then broadcast and verify.
 
 ## Execution Sequence

@@ -1,8 +1,12 @@
-# EVM On-Chain Integration
+# EVM OnChain Integration
 
-On-chain integration means creating Flow payment streams directly from a Solidity smart contract by calling functions on the deployed `SablierFlow` contract. The caller's contract must first approve the ERC-20 token transfer to the Flow contract (for `createAndDeposit`), then invoke the appropriate create function. Two creation functions are available: `create` (zero-balance stream) and `createAndDeposit` (stream with immediate funding).
+Onchain integration means creating Flow payment streams directly from a Solidity smart contract by calling functions on the deployed `SablierFlow` contract. The caller's contract must first approve the ERC-20 token transfer to the Flow contract (for `createAndDeposit`), then invoke the appropriate create function.
 
-Each create function accepts a `ratePerSecond` parameter in `UD21x18` format — a fixed-point type from the [PRBMath](https://github.com/PaulRBerg/prb-math) library, encoded as `uint128` with 18 decimals, where `1e18` = 1 whole token per second. The stream has no predefined end date — debt accrues continuously until paused or voided. Multiple streams can be created in a single transaction using the built-in `batch()` function.
+Two creation functions are available: `create` (zero-balance stream) and `createAndDeposit` (stream with immediate funding).
+
+Each create function accepts a `ratePerSecond` parameter in `UD21x18` format — a fixed-point type from the PRBMath library, encoded as `uint128` with 18 decimals, where `1e18` = 1 whole token per second. The stream has no predefined end date — debt accrues continuously until paused or voided.
+
+Multiple streams can be created in a single transaction using the built-in `batch()` function.
 
 ## What Happens on Create
 

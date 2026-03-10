@@ -65,7 +65,6 @@ Stop and call out unsupported requests before selecting an execution path.
 Treat the following as unsupported by this skill and by Sablier Merkle:
 
 - Distributing native tokens (ETH, BNB, AVAX, etc.). Only ERC-20 tokens can be airdropped. If the user wants to airdrop a native token, inform them they must wrap it first (e.g. WETH) and provide the wrapped token contract address.
-- Solana airdrops. This skill covers EVM chains only.
 - Launching tokens for users. Require the user to explicitly provide an existing token address as input.
 - Resolving token symbols (e.g. "USDC") to contract addresses. If the user provides a symbol instead of an address, ask them to provide the exact ERC-20 contract address.
 
@@ -74,7 +73,7 @@ Treat the following as unsupported by this skill and by Sablier Merkle:
 If any of the following are missing or ambiguous from the user's input, use the `AskUserQuestion` tool to ask the user to clarify before proceeding:
 
 - Campaign type (Instant, LL, LT, or VCA — use the [decision tree](#choosing-a-campaign-type) if unclear)
-- Recipient list (CSV with addresses and amounts, or a file path)
+- Recipient list (file path to a CSV, or pasted inline for small lists)
 - Token address
 - Campaign start time (when claims open)
 - Expiration (when unclaimed tokens can be recovered; `0` for never — except VCA which requires expiration)
@@ -109,28 +108,6 @@ Do not guess or silently apply defaults for the campaign type, recipient list, o
 | ---------------------------------------------- | ----------------------------------------------- | ---------------------------- |
 | Airdrop campaign creation on the user's behalf | Use [evm-cli.md](references/evm-cli.md)         | Not supported by this skill. |
 | Onchain integration guidance                   | Use [evm-onchain.md](references/evm-onchain.md) | Not supported by this skill. |
-
-## Important Notes
-
-**`aggregateAmount` is not enforced onchain.** The Merkle tree leaf amounts are what enforce correctness. If the campaign is funded with less than the true aggregate, later claims will fail. Always fund the campaign with at least the full aggregate amount.
-
-**Token amounts must be in the token's smallest unit.** For example, for an 18-decimal token, 1.0 token = `1000000000000000000`. For a 6-decimal token like USDC, 1.0 USDC = `1000000`.
-
-**`initialAdmin` can differ from the campaign creator.** The `initialAdmin` is the address authorized to clawback unclaimed tokens — it does not have to be the same address that deploys the campaign. If the user does not specify an admin, default to the sender address.
-
-## Campaign Lifecycle
-
-```
-1. CREATE    → Deploy campaign via factory
-2. FEE       → Send creation fee to comptroller
-3. FUND      → Transfer tokens to the campaign contract
-4. CLAIMS    → Recipients claim with Merkle proofs (after campaignStartTime)
-5. CLAWBACK  → (optional) Admin recovers unclaimed tokens after expiration
-```
-
-**Clawback** is allowed up until 7 days have passed since the first claim, and after the campaign has expired. It is blocked in between.
-
-**Important:** Creation and funding are decoupled — the campaign contract can exist before tokens are deposited. However, claims will fail if the campaign has insufficient token balance, so always fund before `campaignStartTime`.
 
 ## Resources
 

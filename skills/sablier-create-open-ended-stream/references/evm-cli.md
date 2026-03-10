@@ -20,15 +20,17 @@ If ERC-20 allowance is insufficient (for `createAndDeposit`), execute an `approv
 
 ## Mandatory Guardrails
 
-### Cast CLI and Browser Wallet Capability Check
+### CLI Prerequisites Check
 
-Before running any `cast` command, verify the CLI is installed and supports `--browser`:
+Before running any commands, verify the required tools are installed:
 
 ```bash
-if ! command -v cast >/dev/null 2>&1; then
-  echo "cast CLI not found. Install Foundry: https://getfoundry.sh/"
-  exit 1
-fi
+for cmd in cast jq; do
+  if ! command -v "$cmd" >/dev/null 2>&1; then
+    echo "$cmd not found."
+    exit 1
+  fi
+done
 
 if ! cast send --help 2>&1 | grep -q -- '--browser'; then
   echo "Your cast version does not support --browser."
@@ -37,7 +39,8 @@ if ! cast send --help 2>&1 | grep -q -- '--browser'; then
 fi
 ```
 
-If the check fails, stop and ask the user to install or upgrade Foundry at [https://getfoundry.sh/](https://getfoundry.sh/).
+- `cast` — required for all onchain interactions. Install Foundry at [https://getfoundry.sh/](https://getfoundry.sh/).
+- `jq` — required for parsing transaction receipts.
 
 ### Signing Method (Mandatory)
 
@@ -80,9 +83,19 @@ while true; do
 
   sleep 5
 done
+
+# Check transaction status (1 = success, 0 = reverted)
+TX_STATUS=$(echo "$RECEIPT" | jq -r '.status')
+if [ "$TX_STATUS" != "0x1" ]; then
+  echo "Transaction reverted: $TX_HASH"
+  exit 1
+fi
 ```
 
-If the receipt is still unavailable after 5 minutes, stop, tell the user the transaction may still be pending, and share the transaction hash for manual follow-up.
+After polling:
+
+- If the receipt is still unavailable after 5 minutes, stop, tell the user the transaction may still be pending, and share the transaction hash for manual follow-up.
+- If `status` is not `0x1`, the transaction reverted — stop, show the transaction hash, and ask the user to investigate on a block explorer.
 
 #### Calendar-Month Caveat for Explicit `"per month"` Requests
 

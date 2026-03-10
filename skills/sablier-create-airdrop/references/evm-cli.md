@@ -2,13 +2,15 @@
 
 ## Overview
 
-This guide is runbook-first: plan the campaign, generate the Merkle tree, run preflight checks, preview the transaction, require explicit confirmation, then deploy, pay the fee, fund, and verify.
+This guide is runbook-first: plan the campaign, generate the Merkle tree, run preflight checks, preview the transactions, require explicit confirmation, then deploy, pay the fee, and fund.
+
+**Prerequisites:** This runbook requires `cast`, `curl`, and `jq` (checked in [CLI Prerequisites](#cli-prerequisites-check)). Merkle tree generation requires a running instance of the [Sablier Merkle API](https://github.com/sablier-labs/merkle-api) with [Pinata](https://www.pinata.cloud/) IPFS credentials — the agent sets this up automatically (see [merkle-tree.md](merkle-tree.md)).
 
 ## Execution Sequence
 
 Use this sequence for every campaign creation:
 
-1. Complete [Intake & Planning Inputs](#intake--planning-inputs): campaign type, Merkle tree, chain, and arguments.
+1. Complete [Intake & Planning Inputs](#intake--planning-inputs): campaign type, chain, inputs, and Merkle tree generation.
 2. Run all [Preflight Checks](#preflight-checks), including token balance and native gas balance.
 3. Build and show a human-readable transaction preview (no broadcast).
 4. Require explicit user confirmation.
@@ -19,15 +21,17 @@ Use this sequence for every campaign creation:
 
 ## Mandatory Guardrails
 
-### Cast CLI and Browser Wallet Capability Check
+### CLI Prerequisites Check
 
-Before running any `cast` command, verify the CLI is installed and supports `--browser`:
+Before running any commands, verify the required tools are installed:
 
 ```bash
-if ! command -v cast >/dev/null 2>&1; then
-  echo "cast CLI not found. Install Foundry: https://getfoundry.sh/"
-  exit 1
-fi
+for cmd in cast curl jq; do
+  if ! command -v "$cmd" >/dev/null 2>&1; then
+    echo "$cmd not found."
+    exit 1
+  fi
+done
 
 if ! cast send --help 2>&1 | grep -q -- '--browser'; then
   echo "Your cast version does not support --browser."
@@ -36,7 +40,9 @@ if ! cast send --help 2>&1 | grep -q -- '--browser'; then
 fi
 ```
 
-If the check fails, stop and ask the user to install or upgrade Foundry at [https://getfoundry.sh/](https://getfoundry.sh/).
+- `cast` — required for all onchain interactions. Install Foundry at [https://getfoundry.sh/](https://getfoundry.sh/).
+- `curl` — required for Merkle API calls.
+- `jq` — required for parsing JSON responses from the Merkle API and transaction receipts.
 
 ### Signing Method (Mandatory)
 
@@ -78,9 +84,19 @@ while true; do
 
   sleep 5
 done
+
+# Check transaction status (1 = success, 0 = reverted)
+TX_STATUS=$(echo "$RECEIPT" | jq -r '.status')
+if [ "$TX_STATUS" != "0x1" ]; then
+  echo "Transaction reverted: $TX_HASH"
+  exit 1
+fi
 ```
 
-If the receipt is still unavailable after 5 minutes, stop, tell the user the transaction may still be pending, and share the transaction hash for manual follow-up.
+After polling:
+
+- If the receipt is still unavailable after 5 minutes, stop, tell the user the transaction may still be pending, and share the transaction hash for manual follow-up.
+- If `status` is not `0x1`, the transaction reverted — stop, show the transaction hash, and ask the user to investigate on a block explorer.
 
 ## Intake & Planning Inputs
 
@@ -99,19 +115,7 @@ Use the [decision tree in SKILL.md](#choosing-a-campaign-type) to select the cam
 
 - If ambiguous, ask the user to clarify using the decision tree.
 
-### 2) Generate Merkle Tree
-
-The Merkle tree must be generated before deploying the campaign. See [merkle-tree.md](merkle-tree.md) for the full process.
-
-**Summary:**
-
-1. Prepare a CSV with `address` and `amount` columns (human-readable amounts — the API handles decimal conversion).
-2. Submit the CSV to the [Sablier Merkle API](https://github.com/sablier-labs/merkle-api).
-3. Receive `merkleRoot` and `ipfsCID` from the API response.
-
-These two values are required inputs for all factory functions. Do not proceed without them.
-
-### 3) Resolve Chain and Factory
+### 2) Resolve Chain and Factory
 
 Look up the factory contract address for the chosen campaign type and target chain at the [Airdrop Deployments page](https://docs.sablier.com/guides/airdrops/deployments.md).
 
@@ -130,18 +134,15 @@ Also look up:
 
 If the requested chain is not listed, ask the user to provide both the RPC URL and the factory address.
 
-### 4) Collect Required Inputs
+### 3) Collect Required Inputs
 
-Collect these before building any transaction:
+Collect these from the user before generating the Merkle tree or building any transaction:
 
-- `chain` (ID and name)
+- `chain` (ID and name — from step 2)
+- `token` address
 - sender wallet address (resolved via `cast wallet address --browser` or provided by the user)
 - signing method (`--browser` preferred, `--private-key` fallback)
-- factory contract address (from step 3)
-- `merkleRoot` and `ipfsCID` (from step 2)
-- `token` address
-- `aggregateAmount` (total tokens to distribute, in token base units)
-- `recipientCount`
+- factory contract address (from step 2)
 - `campaignName`
 - `campaignStartTime` (Unix timestamp when claims open; `0` for immediate)
 - `expiration` (Unix timestamp; `0` for never — except VCA which requires expiration)
@@ -155,6 +156,41 @@ Collect these before building any transaction:
 | MerkleLL      | `lockup` address, `cancelable`, `transferable`, `shape`, `totalDuration`, `cliffDuration`, `cliffUnlockPercentage` (UD60x18), `startUnlockPercentage` (UD60x18), `vestingStartTime` |
 | MerkleLT      | `lockup` address, `cancelable`, `transferable`, `shape`, `tranchesWithPercentages` array (each: `unlockPercentage` as UD2x18, `duration`), `vestingStartTime`                       |
 | MerkleVCA     | `unlockPercentage` (UD60x18), `vestingStartTime`, `vestingEndTime`                                                                                                                  |
+
+### 4) Collect Recipient Data and Generate Merkle Tree
+
+Follow the full process in [merkle-tree.md](merkle-tree.md): collect the CSV, validate it, run the Merkle API, and parse the response. This step requires `TOKEN` and `RPC_URL` from steps 2–3.
+
+This step produces four values used throughout the rest of the runbook:
+
+- `MERKLE_ROOT` — for the factory's `merkleRoot` parameter
+- `IPFS_CID` — for the factory's `ipfsCID` parameter
+- `AGGREGATE_AMOUNT` — total tokens in base units, for `aggregateAmount` and funding
+- `RECIPIENT_COUNT` — for `recipientCount`
+
+Do not proceed to preflight checks without all four values.
+
+## Important Notes
+
+**`aggregateAmount` is not enforced onchain.** The Merkle tree leaf amounts are what enforce correctness. If the campaign is funded with less than the true aggregate, later claims will fail. Always fund the campaign with at least the full aggregate amount.
+
+**Token amounts must be in the token's smallest unit.** For example, for an 18-decimal token, 1.0 token = `1000000000000000000`. For a 6-decimal token like USDC, 1.0 USDC = `1000000`.
+
+**`initialAdmin` can differ from the campaign creator.** The `initialAdmin` is the address authorized to clawback unclaimed tokens — it does not have to be the same address that deploys the campaign. If the user does not specify an admin, default to the sender address.
+
+**Creation and funding are decoupled** — the campaign contract can exist before tokens are deposited. However, claims will fail if the campaign has insufficient token balance, so always fund before `campaignStartTime`.
+
+## Campaign Lifecycle
+
+```
+1. CREATE    → Deploy campaign via factory
+2. FEE       → Send creation fee to comptroller
+3. FUND      → Transfer tokens to the campaign contract
+4. CLAIMS    → Recipients claim with Merkle proofs (after campaignStartTime)
+5. CLAWBACK  → (optional) Admin recovers unclaimed tokens after expiration
+```
+
+**Clawback** is allowed up until 7 days have passed since the first claim, and after the campaign has expired. It is blocked in between.
 
 ## Preflight Checks
 
@@ -506,13 +542,17 @@ TOKEN="0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"  # USDC on Ethereum
 COMPTROLLER=$(cast call "$FACTORY" "comptroller()(address)" --rpc-url "$RPC_URL")
 OWNER=$(cast wallet address --browser)
 
-# From Merkle API
-MERKLE_ROOT="0x..."
-IPFS_CID="Qm..."
+# Generate Merkle tree via API (see merkle-tree.md for full setup)
+CSV_FILE="/path/to/recipients.csv"   # User-provided file path
+DECIMALS=$(cast call "$TOKEN" "decimals()(uint8)" --rpc-url "$RPC_URL")
+MERKLE_API_URL="http://localhost:3030"  # Or user's hosted instance
 
-# 10,000 USDC = 10,000 * 1e6 = 10_000_000_000 (6-decimal base units)
-AGGREGATE_AMOUNT="10000000000"
-RECIPIENT_COUNT="50"
+RESPONSE=$(curl -s -X POST "${MERKLE_API_URL}/api/create?decimals=${DECIMALS}" \
+  -F "data=@${CSV_FILE}")
+MERKLE_ROOT=$(echo "$RESPONSE" | jq -r '.root')
+IPFS_CID=$(echo "$RESPONSE" | jq -r '.cid')
+AGGREGATE_AMOUNT=$(echo "$RESPONSE" | jq -r '.total')
+RECIPIENT_COUNT=$(echo "$RESPONSE" | jq -r '.recipients')
 
 # Campaign starts in 24 hours, no expiration
 START_TIME=$(echo "$(date +%s) + 86400" | bc)

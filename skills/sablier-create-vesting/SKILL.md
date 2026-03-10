@@ -39,6 +39,7 @@ Stop and call out unsupported requests before selecting an execution path.
 
 Treat the following as unsupported by this skill and by Sablier Lockup:
 
+- Vesting native tokens (ETH, BNB, AVAX, etc.). Only ERC-20 tokens can be vested. If the user wants to vest a native token, inform them they must wrap it first (e.g. WETH) and provide the wrapped token contract address.
 - Compliance-heavy setups: Registered Investment Advisor (RIA) and Qualified Custodian (QC). Recommend evaluating custodial offchain solutions.
 - Governance or voting with locked tokens.
 - Launching tokens for users. Require the user to explicitly provide an existing token address as input.

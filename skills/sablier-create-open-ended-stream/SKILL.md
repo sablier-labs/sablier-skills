@@ -87,10 +87,10 @@ If the user explicitly requests a streaming amount `"per month"`:
 2. If the request is any other integration type, inform the user that this skill does not support non-onchain integrations and stop.
 3. Otherwise, follow the route below.
 
-| Intent                                       | EVM                                             | Solana                                   |
-| -------------------------------------------- | ----------------------------------------------- | ---------------------------------------- |
-| Payment stream creation on the user's behalf | Use [evm-cli.md](references/evm-cli.md)         | Not available. Sablier Flow is EVM-only. |
-| Onchain integration guidance                 | Use [evm-onchain.md](references/evm-onchain.md) | Not available. Sablier Flow is EVM-only. |
+| Intent                                       | EVM                                             | Solana                       |
+| -------------------------------------------- | ----------------------------------------------- | ---------------------------- |
+| Payment stream creation on the user's behalf | Use [evm-cli.md](references/evm-cli.md)         | Not supported by this skill. |
+| Onchain integration guidance                 | Use [evm-onchain.md](references/evm-onchain.md) | Not supported by this skill. |
 
 ## Resources
 

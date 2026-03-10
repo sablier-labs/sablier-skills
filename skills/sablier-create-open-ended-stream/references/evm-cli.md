@@ -124,8 +124,8 @@ Infer whether to fund the stream upfront:
 
 | Signal                                                                                   | Function                                              |
 | ---------------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| "create a stream", "start streaming", no mention of deposit                              | `**create`\*\* — stream starts with zero balance      |
-| "create and deposit", "fund the stream", "deposit tokens", mentions an amount to deposit | `**createAndDeposit**` — stream is funded immediately |
+| "create a stream", "start streaming", no mention of deposit                              | **`create`** — stream starts with zero balance        |
+| "create and deposit", "fund the stream", "deposit tokens", mentions an amount to deposit | **`createAndDeposit`** — stream is funded immediately |
 
 - If the user wants to deposit tokens upfront but hasn't specified an amount, ask them to provide the deposit amount.
 - If ambiguous, ask the user whether they want to fund the stream at creation or deposit later.
@@ -536,7 +536,7 @@ createAndDeposit(
 **Arguments:**
 
 1–6. Same as `create` above.
-7\. **amount** - initial deposit in the token's base units (e.g. `1000000000` for 1000 USDC with 6 decimals). Must be > 0.
+7. **amount** — initial deposit in the token's base units (e.g. `1000000000` for 1000 USDC with 6 decimals). Must be > 0.
 
 ### `batch`
 

@@ -216,18 +216,19 @@ Run all checks from [Preflight Checks](#preflight-checks), calculate `MSG_VALUE`
 
 #### 3) Preview Transaction (No Broadcast)
 
-Build and display calldata so the user can review the exact transaction before signing:
+Build calldata internally if needed to validate the exact transaction before signing, but do not show the raw calldata in the default preview:
 
 ```bash
 CALLDATA=$(cast calldata "$FUNCTION_SIG" $FUNCTION_ARGS)
-echo "Calldata: $CALLDATA"
 ```
 
-Present a human-readable summary:
+Present a human-readable summary.
+
+Default preview rule: show only human-readable values in the user-facing preview. Do not show raw calldata or token base-unit integers unless the user explicitly asks for the exact machine values in a separate follow-up.
 
 - **Contract:** `$LOCKUP`
 - **Function:** chosen `create*` entrypoint
-- **Recipient, token, amount, shape, duration/timestamps**
+- **Recipient, token, amount, shape, duration/timestamps**. In the preview, the amount field must show only the human-readable token amount, for example `(0.1 USDC)`.
 - **Creation fee:** ~$1 USD in native token (`MSG_VALUE`)
 - **Expected UI slug after confirmation:** `LK2-${CHAIN_ID}-<streamId>`
 
@@ -304,11 +305,13 @@ Each `CALL_N` is a complete calldata blob (4-byte selector + ABI-encoded argumen
 
 #### 4) Preview Batch Transaction (No Broadcast)
 
-Present a human-readable summary:
+Present a human-readable summary.
+
+Apply the same default preview rule: do not show `CALL_N` blobs or token base-unit integers unless the user explicitly asks for the exact machine values in a separate follow-up.
 
 - **Contract:** `$LOCKUP`
 - **Function:** `batch(bytes[])`
-- **Number of streams**, each with: recipient, amount, shape, duration
+- **Number of streams**, each with: recipient, human-readable amount only (for example `(0.1 USDC)`), shape, duration
 - **Creation fee:** ~$1 USD in native token (`MSG_VALUE`) for the entire batch
 - **Expected UI slug after confirmation:** `LK2-${CHAIN_ID}-<streamId>`
 
@@ -492,6 +495,8 @@ batch(bytes[] calls)
 
 ## Worked Examples
 
+These examples intentionally use raw integers and ABI-ready arguments because they are for command construction. Do not copy these machine values into the default transaction preview; show human-readable token amounts first, and provide exact machine values separately only if the user explicitly asks.
+
 ### Single Stream: `createWithDurationsLL`
 
 A single cliff stream of 1000 USDC (6 decimals) with a 90-day cliff and 365-day total duration on Ethereum mainnet:
@@ -555,7 +560,7 @@ TX_HASH=$(cast send "$LOCKUP" "batch(bytes[])" "[$CALL_1,$CALL_2,$CALL_3]" \
 
 Notes:
 
-- ERC-20 approval must cover the total deposit: 3 × 1000000000 = 3000000000 (3000 USDC)
+- ERC-20 approval must cover the total deposit: `3 × 1000000000 = 3000000000` base units (3000 USDC)
 - `linear` selects the Linear shape
 - `MSG_VALUE` = ~$1 USD worth of native token for the entire batch
 - All three streams use the same `SablierLockup` contract and the same `batch()` entrypoint

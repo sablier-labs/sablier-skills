@@ -270,19 +270,20 @@ Run all checks from [Preflight Checks](#preflight-checks), calculate `MSG_VALUE`
 
 #### 3) Preview Transaction (No Broadcast)
 
-Build and display calldata so the user can review the exact transaction before signing:
+Build calldata internally if needed to validate the exact transaction before signing, but do not show the raw calldata in the default preview:
 
 ```bash
 CALLDATA=$(cast calldata "$FUNCTION_SIG" $FUNCTION_ARGS)
-echo "Calldata: $CALLDATA"
 ```
 
-Present a human-readable summary:
+Present a human-readable summary.
+
+Default preview rule: show only human-readable values in the user-facing preview. Do not show raw calldata, raw `ratePerSecond` integers, `UD21x18` labels, or token base-unit integers unless the user explicitly asks for the exact machine values in a separate follow-up.
 
 - **Contract:** `$FLOW`
 - **Function:** `create` or `createAndDeposit`
-- **Recipient, token, rate per second (with human-readable equivalent), start time**
-- **Deposit amount** (for `createAndDeposit`)
+- **Recipient, token, rate per second, start time**. In the preview, the rate field must show only the human-readable equivalent, for example `~0.0001 USDC per 30-day month`.
+- **Deposit amount** (for `createAndDeposit`). Show only the human-readable token amount, for example `(0.1 USDC)`.
 - **Creation fee:** ~$1 USD in native token (`MSG_VALUE`)
 - **Expected UI slug after confirmation:** `FL3-${CHAIN_ID}-<streamId>`
 
@@ -361,11 +362,13 @@ You can mix `create` and `createAndDeposit` calls in the same batch.
 
 #### 4) Preview Batch Transaction (No Broadcast)
 
-Present a human-readable summary:
+Present a human-readable summary.
+
+Apply the same default preview rule: do not show `CALL_N` blobs, raw `ratePerSecond` integers, `UD21x18` labels, or token base-unit integers unless the user explicitly asks for the exact machine values in a separate follow-up.
 
 - **Contract:** `$FLOW`
 - **Function:** `batch(bytes[])`
-- **Number of streams**, each with: recipient, token, rate per second, start time, deposit amount (if any)
+- **Number of streams**, each with: recipient, token, human-readable rate only (for example `~0.0001 USDC per 30-day month`), start time, human-readable deposit amount (if any, for example `(0.1 USDC)`)
 - **Creation fee:** ~$1 USD in native token (`MSG_VALUE`) for the entire batch
 - **Expected UI slug after confirmation:** `FL3-${CHAIN_ID}-<streamId>`
 
@@ -523,6 +526,8 @@ ratePerSecond = (tokensPerPeriod * 1e18) / secondsInPeriod
 
 ## Worked Examples
 
+These examples intentionally use raw integers and ABI-ready arguments because they are for command construction. Do not copy these machine values into the default transaction preview; show human-readable token amounts and rates first, and provide exact machine values separately only if the user explicitly asks.
+
 ### Single Stream: `createAndDeposit`
 
 A single payment stream of 1000 USDC per 30-day month (6 decimals) with 3000 USDC deposited upfront on Ethereum mainnet:
@@ -557,7 +562,7 @@ Notes:
 - `3000000000` = 3000 USDC in 6-decimal base units (3 months of runway)
 - `0` for `startTime` = stream starts immediately at `block.timestamp`
 - `true` for `transferable` = the stream NFT can be transferred
-- ERC-20 approval for 3000000000 USDC to the `SablierFlow` contract is required before this call
+- ERC-20 approval for `AMOUNT` (`3000000000` base units = 3000 USDC) to the `SablierFlow` contract is required before this call
 - `MSG_VALUE` = ~$1 USD worth of native token (see [Creation Fee](#creation-fee-msg_value))
 - After confirmation, extract the real `streamId` from the `CreateFlowStream` log in the confirmed receipt and build the final app link as `https://app.sablier.com/payments/stream/FL3-${CHAIN_ID}-${STREAM_ID}`
 

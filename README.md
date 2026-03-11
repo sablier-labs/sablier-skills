@@ -1,37 +1,96 @@
 # Sablier Skills
 
-AI agent skills for creating token vesting streams, understanding the Sablier protocol, and choosing the right product for onchain token distribution.
+Installable AI agent skills for Sablier workflows. This catalog covers product selection, protocol context, fixed-schedule vesting, open-ended payroll streams, and Merkle airdrop creation.
 
-## Installation
+## Install
+
+Install the full catalog:
 
 ```bash
-# Add all skills
 npx skills add sablier-labs/sablier-skills
+```
 
-# Add a specific skill
-npx skills add sablier-labs/sablier-skills -s sablier-create-vesting
+Install a single skill:
 
-# Add globally for all projects
-npx skills add sablier-labs/sablier-skills -s sablier-create-vesting -g
+```bash
+npx skills add sablier-labs/sablier-skills --skill sablier-create-vesting
+```
 
-# Target a specific agent (claude-code, cursor, cline, codex, etc.)
-npx skills add sablier-labs/sablier-skills -s sablier-create-vesting -a claude-code
+Preview the catalog before installing:
 
-# List available skills before installing
+```bash
 npx skills add sablier-labs/sablier-skills -l
 ```
 
-## Skills
+Pass `-g` to install globally.
 
-| Skill                       | Description                                                             |
-| --------------------------- | ----------------------------------------------------------------------- |
-| `sablier-create-vesting`    | Create token vesting streams using Sablier Lockup on EVM chains         |
-| `sablier-product-selection` | Choose the right Sablier product for your token distribution use case   |
-| `sablier-protocol`          | Sablier protocol overview: token vesting, airdrops, and onchain payroll |
+## Use
 
-## Usage
+Once installed, call a skill explicitly or let the agent route automatically.
 
-Once installed, skills are automatically available to your AI assistant. Reference them by name in your prompts or let the assistant detect when a skill is relevant.
+```text
+Use sablier-product-selection: I need to distribute tokens to 8,000 wallets and let recipients claim individually.
+
+Use sablier-create-vesting: Create a 4-year vesting stream with a 12-month cliff on Arbitrum for 0x...
+
+Use sablier-create-open-ended-stream: Stream 1 USDC per hour on Base to 0x...
+
+Use sablier-create-airdrop: Create an instant Merkle airdrop on Ethereum from this CSV.
+
+Use sablier-protocol: Explain the difference between Lockup, Flow, and Airdrops.
+```
+
+## Included Skills
+
+| Skill                              | Use it for                                                           | Scope                        |
+| ---------------------------------- | -------------------------------------------------------------------- | ---------------------------- |
+| `sablier-create-airdrop`           | Create Merkle airdrop campaigns from recipient CSVs                  | Sablier Airdrops, EVM        |
+| `sablier-create-open-ended-stream` | Create open-ended token payment streams with a configurable rate     | Sablier Flow, EVM            |
+| `sablier-create-vesting`           | Create fixed-schedule vesting streams with upfront funding           | Sablier Lockup, EVM + Solana |
+| `sablier-product-selection`        | Choose between Lockup, Flow, and Airdrops before implementation      | Advisory / routing           |
+| `sablier-protocol`                 | Explain the Sablier product surface and common distribution patterns | Advisory / context           |
+
+## Repo Structure
+
+```text
+skills/
+  sablier-create-airdrop/
+  sablier-create-open-ended-stream/
+  sablier-create-vesting/
+  sablier-product-selection/
+  sablier-protocol/
+justfile
+README.md
+```
+
+Each skill directory contains `SKILL.md` and may also ship:
+
+- `assets/` for ABIs and other static data
+- `references/` for execution notes and product-specific guidance
+- `scripts/` for local helpers; today only `sablier-create-airdrop` includes code
+
+## Contributing
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for local setup, formatting, and test commands.
+
+## Airdrop Helper
+
+`skills/sablier-create-airdrop/scripts/generate-merkle-campaign.mjs` validates `address,amount` CSVs, builds a Standard Merkle Tree artifact, uploads the campaign payload to Pinata, and prints CLI-ready JSON with:
+
+- `root`
+- `cid`
+- `total`
+- `recipients`
+- `artifactPath`
+
+Example:
+
+```bash
+cd skills/sablier-create-airdrop/scripts
+PINATA_JWT=... node generate-merkle-campaign.mjs \
+  --csv-file recipients.csv \
+  --decimals 18
+```
 
 ## Resources
 

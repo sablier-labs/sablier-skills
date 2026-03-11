@@ -4,7 +4,7 @@
 
 This guide is runbook-first: plan the campaign, generate the Merkle tree, run preflight checks, preview the transactions, require explicit confirmation, then deploy and fund.
 
-**Prerequisites:** This runbook requires `cast`, `curl`, and `jq` (checked in [CLI Prerequisites](#cli-prerequisites-check)). Merkle tree generation requires a running instance of the [Sablier Merkle API](https://github.com/sablier-labs/merkle-api) with [Pinata](https://www.pinata.cloud/) IPFS credentials — the agent sets this up automatically (see [merkle-tree.md](merkle-tree.md)).
+**Prerequisites:** This runbook requires `cast`, `jq`, and `node` (checked in [CLI Prerequisites](#cli-prerequisites-check)). Merkle tree generation uses the local helper in `skills/sablier-create-airdrop/scripts` plus a single Pinata JWT for IPFS publication (see [merkle-tree.md](merkle-tree.md)).
 
 ## Execution Sequence
 
@@ -25,7 +25,7 @@ Use this sequence for every campaign creation:
 Before running any commands, verify the required tools are installed:
 
 ```bash
-for cmd in cast curl jq; do
+for cmd in cast jq node; do
   if ! command -v "$cmd" >/dev/null 2>&1; then
     echo "$cmd not found."
     exit 1
@@ -40,8 +40,8 @@ fi
 ```
 
 - `cast` — required for all onchain interactions. Install Foundry at [https://getfoundry.sh/](https://getfoundry.sh/).
-- `curl` — required for Merkle API calls.
-- `jq` — required for parsing JSON responses from the Merkle API and transaction receipts.
+- `jq` — required for parsing JSON responses from the local generator and transaction receipts.
+- `node` — required for the local Merkle generator.
 
 ### Signing Method (Mandatory)
 
@@ -155,7 +155,7 @@ Collect these from the user before generating the Merkle tree or building any tr
 
 ### 4) Collect Recipient Data and Generate Merkle Tree
 
-Follow the full process in [merkle-tree.md](merkle-tree.md): collect the CSV, validate it, run the Merkle API, and parse the response. This step requires `TOKEN` and `RPC_URL` from steps 2–3.
+Follow the full process in [merkle-tree.md](merkle-tree.md): collect the CSV, validate it, run the local generator, and parse the response. This step requires `TOKEN` and `RPC_URL` from steps 2–3.
 
 This step produces four values used throughout the rest of the runbook:
 
@@ -453,17 +453,20 @@ RPC_URL="<resolved-or-user-provided-rpc>"
 TOKEN="0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"  # USDC on Ethereum
 OWNER=$(cast wallet address --browser)
 
-# Generate Merkle tree via API (see merkle-tree.md for full setup)
+# Install the local generator once
+npm install --prefix "skills/sablier-create-airdrop/scripts"
+
+# Generate the Merkle tree locally (see merkle-tree.md for full setup)
 CSV_FILE="/path/to/recipients.csv"   # User-provided file path
 DECIMALS=$(cast call "$TOKEN" "decimals()(uint8)" --rpc-url "$RPC_URL")
-MERKLE_API_URL="http://localhost:3030"  # Or user's hosted instance
-
-RESPONSE=$(curl -s -X POST "${MERKLE_API_URL}/api/create?decimals=${DECIMALS}" \
-  -F "data=@${CSV_FILE}")
-MERKLE_ROOT=$(echo "$RESPONSE" | jq -r '.root')
-IPFS_CID=$(echo "$RESPONSE" | jq -r '.cid')
-AGGREGATE_AMOUNT=$(echo "$RESPONSE" | jq -r '.total')
-RECIPIENT_COUNT=$(echo "$RESPONSE" | jq -r '.recipients')
+GENERATOR_OUTPUT=$(PINATA_JWT="$PINATA_JWT" \
+  node "skills/sablier-create-airdrop/scripts/generate-merkle-campaign.mjs" \
+    --csv-file "$CSV_FILE" \
+    --decimals "$DECIMALS")
+MERKLE_ROOT=$(echo "$GENERATOR_OUTPUT" | jq -r '.root')
+IPFS_CID=$(echo "$GENERATOR_OUTPUT" | jq -r '.cid')
+AGGREGATE_AMOUNT=$(echo "$GENERATOR_OUTPUT" | jq -r '.total')
+RECIPIENT_COUNT=$(echo "$GENERATOR_OUTPUT" | jq -r '.recipients')
 
 # Campaign starts in 24 hours, no expiration
 START_TIME=$(echo "$(date +%s) + 86400" | bc)

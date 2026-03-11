@@ -1,6 +1,6 @@
 # Merkle Tree Generation
 
-This reference covers the full process: collecting recipient data, running the Merkle API, and extracting the values needed for campaign deployment. The agent handles every step — the only user-provided inputs are the recipient CSV and Pinata credentials.
+This reference covers the full process: collecting recipient data, generating the Merkle tree locally, pinning the campaign JSON to IPFS through Pinata, and extracting the values needed for campaign deployment. The agent handles every step — the only user-provided inputs are the recipient CSV and a single Pinata JWT.
 
 ## 1) Collect Recipient Data
 
@@ -23,11 +23,12 @@ Set `CSV_FILE` to the file path and proceed.
 ### CSV Format
 
 - Header row must be exactly `address,amount`
-- Amounts in **human-readable units** (not base units) — the API handles decimal conversion
-- Addresses must be valid EIP-55 checksummed Ethereum addresses
+- Amounts in **human-readable units** (not base units) — the local generator handles decimal conversion
+- Addresses must be valid EVM addresses; the generator normalizes them to checksummed form
 - No duplicate addresses allowed
 - All amounts must be positive and non-zero
 - Decimal places in amounts must not exceed the token's `decimals` value
+- The CSV must contain at least **2 recipients**
 
 Example:
 
@@ -40,11 +41,11 @@ address,amount
 
 ### Pre-submission Validation
 
-Before submitting to the API, verify:
+Before running the generator, verify:
 
 1. The file exists and is readable.
 2. The header row is exactly `address,amount`.
-3. There is at least one data row after the header.
+3. There are at least two data rows after the header.
 4. All addresses match the `0x[0-9a-fA-F]{40}` pattern.
 5. All amounts are numeric and positive.
 
@@ -58,161 +59,93 @@ Query the token's `decimals` from the chain — this is required by the API:
 DECIMALS=$(cast call "$TOKEN" "decimals()(uint8)" --rpc-url "$RPC_URL")
 ```
 
-## 3) Start the Merkle API
+## 3) Install the Local Generator
 
-The [Sablier Merkle API](https://github.com/sablier-labs/merkle-api) generates the Merkle tree, uploads it to IPFS via [Pinata](https://www.pinata.cloud/), and returns the root and CID. The agent sets up and runs the API locally.
+The airdrop skill ships with a local Node helper that reproduces the Merkle API create path without cloning or running the Rust server.
 
-### Check if already running
-
-```bash
-curl -s http://localhost:3030/api/health | jq -r '.status'
-```
-
-If the health check returns `"success"`, skip to [step 4](#4-submit-csv-and-parse-response).
-
-### Prerequisites
-
-Verify the Rust toolchain is installed:
+Install the package once:
 
 ```bash
-if ! command -v cargo >/dev/null 2>&1; then
-  echo "Rust toolchain not found. Install from https://rustup.rs"
-  exit 1
-fi
+npm install --prefix "skills/sablier-create-airdrop/scripts"
 ```
 
-If `cargo` is not available, stop and tell the user to install Rust from [https://rustup.rs](https://rustup.rs).
+This requires Node.js. No Rust toolchain or local `merkle-api` process is needed.
 
-### Obtain Pinata Credentials
+### Obtain a Pinata JWT
 
-The API uploads Merkle tree data to IPFS via Pinata. Pinata does not support programmatic account creation — the user must create a free account once at [pinata.cloud](https://www.pinata.cloud/) and provide the credentials.
+The local generator pins the campaign JSON to IPFS through Pinata's JSON upload endpoint.
 
-Ask the user for these three values (all found in the Pinata dashboard under API Keys):
+Ask the user to open the Pinata API keys page at [https://app.pinata.cloud/developers/api-keys](https://app.pinata.cloud/developers/api-keys), create an API key, and copy the JWT as:
 
-- `PINATA_API_KEY`
-- `PINATA_SECRET_API_KEY`
-- `PINATA_ACCESS_TOKEN` (JWT)
+- `PINATA_JWT`
 
-### Clone and Build
+Inform the user they only need `Write` permission for the `Files` resource.
+
+## 4) Run the Local Generator and Parse Its Output
 
 ```bash
-MERKLE_API_DIR="/tmp/sablier-merkle-api"
-MERKLE_API_LOG="/tmp/sablier-merkle-api.log"
-
-if [ ! -d "$MERKLE_API_DIR" ]; then
-  git clone https://github.com/sablier-labs/merkle-api.git "$MERKLE_API_DIR"
-fi
-
-cat > "$MERKLE_API_DIR/.env" << EOF
-PINATA_API_KEY=$PINATA_API_KEY
-PINATA_SECRET_API_KEY=$PINATA_SECRET_API_KEY
-PINATA_ACCESS_TOKEN=$PINATA_ACCESS_TOKEN
-PINATA_API_SERVER=https://api.pinata.cloud
-IPFS_GATEWAY=https://gateway.pinata.cloud
-MERKLE_API_BEARER_TOKEN=
-EOF
+GENERATOR_OUTPUT=$(PINATA_JWT="$PINATA_JWT" \
+  node "skills/sablier-create-airdrop/scripts/generate-merkle-campaign.mjs" \
+    --csv-file "$CSV_FILE" \
+    --decimals "$DECIMALS")
 ```
 
-Build the project first. The initial compilation takes several minutes — inform the user and show progress:
+**On success:**
 
-```bash
-(cd "$MERKLE_API_DIR" && cargo build --release 2>&1) | tail -5
-```
-
-If `cargo build` fails, stop and show the error output.
-
-### Start the Server
-
-```bash
-(cd "$MERKLE_API_DIR" && cargo run --release > "$MERKLE_API_LOG" 2>&1) &
-```
-
-Wait for the server to be ready:
-
-```bash
-HEALTHY=false
-for i in $(seq 1 15); do
-  if curl -s http://localhost:3030/api/health | jq -e '.status == "success"' > /dev/null 2>&1; then
-    HEALTHY=true
-    break
-  fi
-  sleep 2
-done
-
-if [ "$HEALTHY" != "true" ]; then
-  echo "Merkle API failed to start. Log output:"
-  cat "$MERKLE_API_LOG"
-  exit 1
-fi
-```
-
-If the server fails to start, show the log output and diagnose. Common issues:
-
-- Invalid Pinata credentials → ask the user to verify at [pinata.cloud](https://www.pinata.cloud/)
-- Port 3030 already in use → check with `lsof -i :3030`
-
-Set `MERKLE_API_URL="http://localhost:3030"`.
-
-## 4) Submit CSV and Parse Response
-
-```bash
-RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
-  "${MERKLE_API_URL}/api/create?decimals=${DECIMALS}" \
-  -F "data=@${CSV_FILE}")
-
-HTTP_CODE=$(echo "$RESPONSE" | tail -1)
-BODY=$(echo "$RESPONSE" | sed '$d')
-```
-
-**On success (HTTP 200):**
-
-The API returns:
+The CLI prints JSON to stdout:
 
 ```json
 {
-  "status": "Upload successful",
+  "root": "0x1234abcd...",
+  "cid": "bafy...",
   "total": "10000000000",
   "recipients": "50",
-  "root": "0x1234abcd...",
-  "cid": "Qm..."
+  "artifactPath": "/var/folders/.../recipients.campaign.json"
 }
 ```
 
 Parse the response:
 
 ```bash
-MERKLE_ROOT=$(echo "$BODY" | jq -r '.root')
-IPFS_CID=$(echo "$BODY" | jq -r '.cid')
-AGGREGATE_AMOUNT=$(echo "$BODY" | jq -r '.total')
-RECIPIENT_COUNT=$(echo "$BODY" | jq -r '.recipients')
+MERKLE_ROOT=$(echo "$GENERATOR_OUTPUT" | jq -r '.root')
+IPFS_CID=$(echo "$GENERATOR_OUTPUT" | jq -r '.cid')
+AGGREGATE_AMOUNT=$(echo "$GENERATOR_OUTPUT" | jq -r '.total')
+RECIPIENT_COUNT=$(echo "$GENERATOR_OUTPUT" | jq -r '.recipients')
+ARTIFACT_PATH=$(echo "$GENERATOR_OUTPUT" | jq -r '.artifactPath')
 ```
 
 - `root` — the Merkle root (`bytes32`) for the campaign's `merkleRoot` parameter.
 - `cid` — the IPFS CID for the campaign's `ipfsCID` parameter.
 - `total` — the aggregate amount already converted to the token's base units. Use directly as `aggregateAmount`.
 - `recipients` — the recipient count. Use directly as `recipientCount`.
+- `artifactPath` — the JSON file that was pinned to IPFS. Keep it for debugging or audits.
 
-**On validation error (HTTP 400):**
+**On validation error:**
+
+The CLI exits non-zero and prints JSON to stderr:
 
 ```json
 {
   "status": "Invalid csv file.",
-  "errors": ["Row 3: invalid address", "Row 5: amount exceeds decimals"]
+  "errors": [
+    "Row 3: Invalid Ethereum address",
+    "Row 5: Amounts should be positive, in normal notation, with an optional decimal point and a maximum number of decimals as provided by the query parameter."
+  ]
 }
 ```
 
 Show the errors to the user and ask them to fix the CSV before retrying.
 
-**On server error (HTTP 500) or API unreachable:**
+**On Pinata upload error:**
 
 Diagnose before stopping:
 
-- Is the server running? `curl -s ${MERKLE_API_URL}/api/health`
-- Are the Pinata credentials valid? Ask the user to verify at [pinata.cloud](https://www.pinata.cloud/).
+- Is `PINATA_JWT` set?
+- Is the JWT valid in Pinata?
 - Is the CSV valid per the [format above](#csv-format)?
 
-Do not proceed with campaign deployment until the Merkle API returns a successful response with all four values.
+Do not proceed with campaign deployment until the generator returns all four deployment values successfully.
 
 ## Leaf Encoding (Reference)
 
-Each leaf encodes three values — `(index, recipient, amount)` — and is **double-hashed** with keccak256 for second preimage resistance. The Merkle API handles this automatically.
+Each leaf encodes three values — `(index, recipient, amount)` — and is **double-hashed** with keccak256 for second preimage resistance. The local generator uses OpenZeppelin's standard Merkle tree implementation with the same leaf schema as the Merkle API create path.

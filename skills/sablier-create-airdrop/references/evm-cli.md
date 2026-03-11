@@ -16,7 +16,7 @@ Use this sequence for every campaign creation:
 4. Require explicit user confirmation for deployment.
 5. Deploy the campaign via the factory with `cast send`, then wait/poll up to 5 minutes for the confirmed receipt.
 6. Use `AskUserQuestion` to ask whether the user wants to fund the campaign now or later.
-7. If the user chooses `Fund now`, run the funding checks and transfer tokens to the campaign, then wait/poll up to 5 minutes for the confirmed receipt.
+7. If the user chooses `Fund now`, run the funding checks, preview the funding transfer, require explicit confirmation, then transfer tokens to the campaign and wait/poll up to 5 minutes for the confirmed receipt.
 8. Exit successfully by sharing the campaign page URL plus campaign metadata. If funding is deferred, clearly warn that claims will fail until the campaign is funded.
 
 ## Mandatory Guardrails
@@ -60,7 +60,7 @@ Always use this sequence for state-changing transactions:
 1. Build a human-readable preview of all transaction parameters.
 2. Show the transaction details to the user.
 3. Ask for explicit confirmation.
-4. Only after confirmation, execute the transactions.
+4. Only after confirmation, run `cast send`.
 
 Never broadcast before explicit user confirmation.
 
@@ -148,11 +148,11 @@ Collect these from the user before generating the Merkle tree or building any tr
 
 **Type-specific inputs:**
 
-| Campaign Type | Additional Inputs                                                                                                                                                                   |
-| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Instant       | None                                                                                                                                                                                |
+| Campaign Type | Additional Inputs                                                                                                                                                                       |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Instant       | None                                                                                                                                                                                    |
 | MerkleLL      | `lockup` address, `cancelable`, `transferable`, `shape`, `totalDuration`, `cliffDuration`, `cliffUnlockPercentage` (`uint256`), `startUnlockPercentage` (`uint256`), `vestingStartTime` |
-| MerkleLT      | `lockup` address, `cancelable`, `transferable`, `shape`, `tranchesWithPercentages` array (each: `unlockPercentage` as `uint64`, `duration`), `vestingStartTime`                       |
+| MerkleLT      | `lockup` address, `cancelable`, `transferable`, `shape`, `tranchesWithPercentages` array (each: `unlockPercentage` as `uint64`, `duration`), `vestingStartTime`                         |
 
 ### 4) Collect Recipient Data and Generate Merkle Tree
 
@@ -232,7 +232,7 @@ GAS_PRICE=$(cast gas-price --rpc-url "$RPC_URL")
 TOTAL_NEEDED=$(echo "$GAS_ESTIMATE * $GAS_PRICE" | bc)
 ```
 
-Compare `TOTAL_NEEDED` against the sender's native balance. If balance is insufficient, stop and tell the user to fund their wallet first.
+Compare `TOTAL_NEEDED` against the sender's native balance. If balance is insufficient, stop and tell the user to fund their wallet first. Recommend buying via [Transak](https://transak.com/buy).
 
 ### Read-Only Validation Commands
 
@@ -340,12 +340,14 @@ If the user chooses `Fund now`, continue to the next step.
 
 ### 7) Fund the Campaign
 
-Before broadcasting, rerun the [Funding Checks](#funding-checks). Then show a short human-readable preview of the funding transfer:
+Before broadcasting, rerun the [Funding Checks](#funding-checks). Then show a short human-readable preview of the funding transfer. The amount line in the preview must show the human-readable token amount for `AGGREGATE_AMOUNT`, not only the raw base-unit integer:
 
 - **Contract:** `$TOKEN`
 - **Function:** `transfer(address,uint256)`
 - **To:** `$CAMPAIGN`
-- **Amount:** `$AGGREGATE_AMOUNT`
+- **Amount:** human-readable token amount for `AGGREGATE_AMOUNT`
+
+Then require explicit confirmation for the funding transfer using the same boxed `Reply exactly: YES` prompt before broadcasting. If the user does not explicitly confirm with `YES`, stop.
 
 Then transfer the aggregate token amount to the deployed campaign address:
 
@@ -357,7 +359,7 @@ TX_HASH=$(cast send "$TOKEN" "transfer(address,uint256)" "$CAMPAIGN" "$AGGREGATE
   --async)
 ```
 
-Wait/poll up to 5 minutes for the confirmed receipt.
+Wait/poll up to 5 minutes for the confirmed receipt per [Receipt Wait Timeout (Mandatory)](#receipt-wait-timeout-mandatory) before proceeding.
 
 ### 8) Direct User to the Campaign
 
@@ -499,7 +501,7 @@ computeMerkleLT(
 
 The `campaignCreator` is the `msg.sender` of the `createMerkle*` call — use the sender's wallet address. The params tuple is identical to the one passed to the corresponding `createMerkle*` function.
 
-## Worked Example
+## Worked Examples
 
 These examples intentionally use raw integers and ABI-ready arguments because they are for command construction. Do not copy these machine values into the default transaction preview; show human-readable token amounts first, and provide exact machine values separately only if the user explicitly asks.
 

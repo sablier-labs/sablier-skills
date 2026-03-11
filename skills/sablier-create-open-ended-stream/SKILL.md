@@ -85,10 +85,10 @@ If the user explicitly requests a streaming amount `"per month"`:
 2. If the request is any other integration type, inform the user that this skill does not support non-onchain integrations and stop.
 3. Otherwise, follow the route below.
 
-| Intent                                          | EVM                                             | Solana                                                                                  |
-| ----------------------------------------------- | ----------------------------------------------- | --------------------------------------------------------------------------------------- |
-| Open-ended stream creation on the user's behalf | Use [evm-cli.md](references/evm-cli.md)         | Not yet supported. Direct the user to [solana.sablier.com](https://solana.sablier.com). |
-| Onchain integration guidance                    | Use [evm-onchain.md](references/evm-onchain.md) | Not yet supported. Direct the user to [solana.sablier.com](https://solana.sablier.com). |
+| Intent                                          | EVM                                             | Solana                                                                                                       |
+| ----------------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Open-ended stream creation on the user's behalf | Use [evm-cli.md](references/evm-cli.md)         | Not yet supported. Direct the user to [solana.sablier.com](https://solana.sablier.com).                      |
+| Onchain integration guidance                    | Use [evm-onchain.md](references/evm-onchain.md) | Not yet supported. Direct the user to [docs.sablier.com](https://docs.sablier.com/solana/sablier-on-solana). |
 
 ## Resources
 

@@ -16,7 +16,7 @@ Use this sequence for every campaign creation:
 4. Require explicit user confirmation.
 5. Deploy the campaign via the factory with `cast send`, wait/poll up to 5 minutes for the confirmed receipt.
 6. Fund the campaign by transferring tokens to the deployed campaign address, wait/poll up to 5 minutes for the confirmed receipt.
-7. Direct the user to [app.sablier.com](https://app.sablier.com).
+7. Direct the user to the campaign page on [app.sablier.com](https://app.sablier.com).
 
 ## Mandatory Guardrails
 
@@ -135,7 +135,7 @@ If the requested chain is not listed, ask the user to provide both the RPC URL a
 
 Collect these from the user before generating the Merkle tree or building any transaction:
 
-- `chain` (ID and name — from step 2)
+- `chain` (ID and name — from step 2; store the numeric chain ID as `CHAIN_ID` for the final campaign URL)
 - `token` address
 - sender wallet address (resolved via `cast wallet address --browser` or provided by the user)
 - signing method (`--browser` preferred, `--private-key` fallback)
@@ -313,9 +313,13 @@ TX_HASH=$(cast send "$TOKEN" "transfer(address,uint256)" "$CAMPAIGN" "$AGGREGATE
 
 Wait/poll up to 5 minutes for the confirmed receipt.
 
-### 7) Direct User to the Sablier App
+### 7) Direct User to the Campaign
 
-After both transactions are confirmed, inform the user they can view and manage the campaign at [app.sablier.com](https://app.sablier.com).
+After both transactions are confirmed, present the direct link to the campaign:
+
+```
+https://app.sablier.com/airdrops/campaign/${CAMPAIGN}-${CHAIN_ID}
+```
 
 ## Entrypoint Catalog
 

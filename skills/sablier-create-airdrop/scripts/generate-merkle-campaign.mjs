@@ -2,6 +2,7 @@
 
 import { StandardMerkleTree } from "@openzeppelin/merkle-tree";
 import { parse as parseCsv } from "csv-parse/sync";
+import { realpathSync } from "node:fs";
 import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, extname, join, resolve } from "node:path";
@@ -21,7 +22,7 @@ export const INVALID_HEADER_ADDRESS_MESSAGE =
 export const INVALID_HEADER_AMOUNT_MESSAGE =
   "CSV header invalid. The csv header should contain `amount` column. The amount column id missing";
 export const INSUFFICIENT_COLUMNS_MESSAGE = "Insufficient columns";
-export const DEFAULT_PINATA_API_URL = "https://api.pinata.cloud/pinning/pinJSONToIPFS";
+export const DEFAULT_PINATA_API_URL = "https://uploads.pinata.cloud/v3/files";
 
 export class CliError extends Error {
   constructor(payload, exitCode = 1) {
@@ -85,6 +86,7 @@ export function parseCliArguments(argv = process.argv.slice(2), env = process.en
       decimals: { type: "string" },
       "output-dir": { type: "string" },
       "pinata-jwt": { type: "string" },
+      "result-file": { type: "string" },
       help: { type: "boolean", short: "h" },
     },
   });
@@ -126,6 +128,7 @@ export function parseCliArguments(argv = process.argv.slice(2), env = process.en
     decimals,
     outputDir: values["output-dir"] ? resolve(values["output-dir"]) : undefined,
     pinataJwt,
+    resultFile: values["result-file"] ? resolve(values["result-file"]) : undefined,
   };
 }
 
@@ -265,6 +268,7 @@ export async function buildCampaignArtifact({ csvFile, decimals, outputDir }) {
 export async function pinJsonToPinata(
   payload,
   {
+    artifactPath,
     pinataJwt,
     fetchImpl = fetch,
     pinataApiUrl = process.env.PINATA_API_URL ?? DEFAULT_PINATA_API_URL,
@@ -278,18 +282,32 @@ export async function pinJsonToPinata(
     });
   }
 
+  const fileName = artifactPath ? basename(artifactPath) : pinataMetadataName;
+  let artifactContents;
+  if (artifactPath) {
+    try {
+      artifactContents = await readFile(artifactPath);
+    } catch (error) {
+      if (error && error.code === "ENOENT") {
+        throw new CliError({ message: `Campaign artifact not found: ${artifactPath}` });
+      }
+      throw new CliError({ message: `Could not read campaign artifact: ${artifactPath}` });
+    }
+  } else {
+    artifactContents = `${JSON.stringify(payload, null, 2)}\n`;
+  }
+
+  const formData = new FormData();
+  formData.set("network", "public");
+  formData.set("name", fileName);
+  formData.set("file", new Blob([artifactContents], { type: "application/json" }), fileName);
+
   const response = await fetchImpl(pinataApiUrl, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${pinataJwt}`,
-      "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      pinataContent: payload,
-      pinataMetadata: {
-        name: pinataMetadataName,
-      },
-    }),
+    body: formData,
   });
 
   const body = await response.text();
@@ -308,15 +326,22 @@ export async function pinJsonToPinata(
       });
     }
 
+    if (response.status === 403 && parsedBody?.error?.reason === "NO_SCOPES_FOUND") {
+      throw new CliError({
+        message:
+          "Pinata rejected the upload with HTTP 403. The provided `PINATA_JWT` does not have the `Files: Write` permission required by the v3 Files API. Update the key at https://app.pinata.cloud/developers/api-keys",
+      });
+    }
+
     throw new CliError({
       message: `Pinata upload failed with HTTP ${response.status}: ${body}`,
     });
   }
 
-  const cid = parsedBody?.IpfsHash;
+  const cid = parsedBody?.data?.cid;
   if (!cid) {
     throw new CliError({
-      message: "Pinata upload succeeded but the response did not contain `IpfsHash`.",
+      message: "Pinata upload succeeded but the response did not contain `data.cid`.",
     });
   }
 
@@ -333,6 +358,7 @@ export async function generateMerkleCampaign({
 }) {
   const { artifactPath, payload } = await buildCampaignArtifact({ csvFile, decimals, outputDir });
   const cid = await pinJsonToPinata(payload, {
+    artifactPath,
     pinataJwt,
     fetchImpl,
     pinataApiUrl,
@@ -350,7 +376,7 @@ export async function generateMerkleCampaign({
 
 export function usage() {
   return `Usage:
-  node generate-merkle-campaign.mjs --csv-file <path> --decimals <n> [--output-dir <path>] [--pinata-jwt <jwt>]
+  node generate-merkle-campaign.mjs --csv-file <path> --decimals <n> [--output-dir <path>] [--pinata-jwt <jwt>] [--result-file <path>]
 
 Required:
   --csv-file      Path to a CSV file with address,amount columns
@@ -360,7 +386,8 @@ Authentication:
   --pinata-jwt    Optional override for the PINATA_JWT environment variable
 
 Output:
-  Prints JSON to stdout with root, cid, total, recipients, and artifactPath`;
+  --result-file   Write result JSON to this file instead of stdout
+  Without --result-file, prints JSON to stdout with root, cid, total, recipients, and artifactPath`;
 }
 
 export async function runCli(argv = process.argv.slice(2), env = process.env) {
@@ -371,11 +398,21 @@ export async function runCli(argv = process.argv.slice(2), env = process.env) {
   }
 
   const result = await generateMerkleCampaign(args);
-  process.stdout.write(`${JSON.stringify(result)}\n`);
+  const json = JSON.stringify(result);
+
+  if (args.resultFile) {
+    await writeFile(args.resultFile, `${json}\n`);
+  } else {
+    process.stdout.write(`${json}\n`);
+  }
 }
 
-const isCliEntrypoint =
-  process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
+let isCliEntrypoint = false;
+try {
+  isCliEntrypoint =
+    process.argv[1] !== undefined &&
+    import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href;
+} catch {}
 
 if (isCliEntrypoint) {
   try {

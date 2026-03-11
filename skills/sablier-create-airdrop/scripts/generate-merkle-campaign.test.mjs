@@ -12,6 +12,7 @@ import {
   CliError,
   buildCampaignArtifact,
   generateMerkleCampaign,
+  parseCliArguments,
   pinJsonToPinata,
 } from "./generate-merkle-campaign.mjs";
 
@@ -25,10 +26,15 @@ async function writeTempCsv(contents) {
   return { directory, csvFile };
 }
 
-function mockFetch(responseInit) {
+function mockFetch(responseInit, { assertRequest } = {}) {
   return async (url, options) => {
-    assert.equal(url, "https://api.pinata.cloud/pinning/pinJSONToIPFS");
-    assert.equal(options.method, "POST");
+    if (assertRequest) {
+      await assertRequest(url, options);
+    } else {
+      assert.equal(url, "https://uploads.pinata.cloud/v3/files");
+      assert.equal(options.method, "POST");
+    }
+
     return {
       ok: responseInit.ok,
       status: responseInit.status,
@@ -197,11 +203,29 @@ test("pinJsonToPinata returns the CID on success", async () => {
     { foo: "bar" },
     {
       pinataJwt: "test-jwt",
-      fetchImpl: mockFetch({
-        ok: true,
-        status: 200,
-        body: JSON.stringify({ IpfsHash: "bafy-test" }),
-      }),
+      fetchImpl: mockFetch(
+        {
+          ok: true,
+          status: 200,
+          body: JSON.stringify({ data: { cid: "bafy-test" } }),
+        },
+        {
+          assertRequest: async (url, options) => {
+            assert.equal(url, "https://uploads.pinata.cloud/v3/files");
+            assert.equal(options.method, "POST");
+            assert.equal(options.headers.Authorization, "Bearer test-jwt");
+            assert.equal(options.headers["Content-Type"], undefined);
+            assert.ok(options.body instanceof FormData);
+            assert.equal(options.body.get("network"), "public");
+            assert.equal(options.body.get("name"), "sablier-merkle-campaign");
+
+            const file = options.body.get("file");
+            assert.equal(file.name, "sablier-merkle-campaign");
+            assert.equal(file.type, "application/json");
+            assert.equal(await file.text(), '{\n  "foo": "bar"\n}\n');
+          },
+        },
+      ),
     },
   );
 
@@ -229,6 +253,32 @@ test("pinJsonToPinata surfaces invalid JWT errors", async () => {
   );
 });
 
+test("pinJsonToPinata surfaces missing Files scope errors", async () => {
+  await assertCliError(
+    () =>
+      pinJsonToPinata(
+        { foo: "bar" },
+        {
+          pinataJwt: "missing-files-scope",
+          fetchImpl: mockFetch({
+            ok: false,
+            status: 403,
+            body: JSON.stringify({
+              error: {
+                reason: "NO_SCOPES_FOUND",
+                details: "This key does not have the required scopes associated with it",
+              },
+            }),
+          }),
+        },
+      ),
+    {
+      message:
+        "Pinata rejected the upload with HTTP 403. The provided `PINATA_JWT` does not have the `Files: Write` permission required by the v3 Files API. Update the key at https://app.pinata.cloud/developers/api-keys",
+    },
+  );
+});
+
 test("generateMerkleCampaign returns CLI-ready JSON", async () => {
   const { directory, csvFile } = await writeTempCsv(`address,amount
 0x9ad7CAD4F10D0c3f875b8a2fd292590490c9f491,100.0
@@ -243,7 +293,7 @@ test("generateMerkleCampaign returns CLI-ready JSON", async () => {
     fetchImpl: mockFetch({
       ok: true,
       status: 200,
-      body: JSON.stringify({ IpfsHash: "bafy-test" }),
+      body: JSON.stringify({ data: { cid: "bafy-test" } }),
     }),
   });
 
@@ -268,8 +318,9 @@ test("CLI runbook works end-to-end against a mocked Pinata endpoint", async () =
     request.on("end", () => {
       assert.equal(request.method, "POST");
       assert.equal(request.headers.authorization, "Bearer test-jwt");
+      assert.match(request.headers["content-type"], /multipart\/form-data;/);
       response.writeHead(200, { "content-type": "application/json" });
-      response.end(JSON.stringify({ IpfsHash: "bafy-cli-test" }));
+      response.end(JSON.stringify({ data: { cid: "bafy-cli-test" } }));
     });
   });
 
@@ -294,7 +345,7 @@ test("CLI runbook works end-to-end against a mocked Pinata endpoint", async () =
       env: {
         ...process.env,
         PINATA_JWT: "test-jwt",
-        PINATA_API_URL: `http://${address.address}:${address.port}/pinning/pinJSONToIPFS`,
+        PINATA_API_URL: `http://${address.address}:${address.port}/v3/files`,
       },
     },
   );
@@ -312,5 +363,90 @@ test("CLI runbook works end-to-end against a mocked Pinata endpoint", async () =
   const parsed = JSON.parse(stdout);
   assert.equal(parsed.cid, "bafy-cli-test");
   assert.equal(parsed.recipients, "2");
-  assert.match(requestBody, /"pinataContent"/);
+  assert.match(requestBody, /name="network"\r\n\r\npublic/);
+  assert.match(requestBody, /name="name"\r\n\r\nrecipients\.campaign\.json/);
+  assert.match(requestBody, /name="file"; filename="recipients\.campaign\.json"/);
+  assert.match(requestBody, /"total_amount": "30000"/);
+  assert.doesNotMatch(requestBody, /pinataContent/);
+});
+
+test("parseCliArguments parses --result-file and resolves the path", () => {
+  const args = parseCliArguments(
+    ["--csv-file", "test.csv", "--decimals", "18", "--result-file", "/tmp/out.json"],
+    { PINATA_JWT: "jwt" },
+  );
+  assert.equal(args.resultFile, "/tmp/out.json");
+});
+
+test("parseCliArguments returns undefined resultFile when omitted", () => {
+  const args = parseCliArguments(["--csv-file", "test.csv", "--decimals", "18"], {
+    PINATA_JWT: "jwt",
+  });
+  assert.equal(args.resultFile, undefined);
+});
+
+test("CLI --result-file writes to file instead of stdout", async () => {
+  const { directory, csvFile } = await writeTempCsv(`address,amount
+0x9ad7CAD4F10D0c3f875b8a2fd292590490c9f491,100.0
+0xf976aF93B0A5A9F55A7f285a3B5355B8575Eb5bc,200.0
+`);
+
+  const server = createServer((request, response) => {
+    request.setEncoding("utf8");
+    let body = "";
+    request.on("data", (chunk) => {
+      body += chunk;
+    });
+    request.on("end", () => {
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(JSON.stringify({ data: { cid: "bafy-result-file-test" } }));
+    });
+  });
+
+  await new Promise((resolvePromise) => {
+    server.listen(0, "127.0.0.1", resolvePromise);
+  });
+
+  const address = server.address();
+  const resultFile = join(directory, "result.json");
+  const { stdout } = await execFileAsync(
+    "node",
+    [
+      "generate-merkle-campaign.mjs",
+      "--csv-file",
+      csvFile,
+      "--decimals",
+      "2",
+      "--output-dir",
+      directory,
+      "--result-file",
+      resultFile,
+    ],
+    {
+      cwd: thisDirectory,
+      env: {
+        ...process.env,
+        PINATA_JWT: "test-jwt",
+        PINATA_API_URL: `http://${address.address}:${address.port}/v3/files`,
+      },
+    },
+  );
+
+  await new Promise((resolvePromise, rejectPromise) => {
+    server.close((error) => {
+      if (error) {
+        rejectPromise(error);
+        return;
+      }
+      resolvePromise();
+    });
+  });
+
+  assert.equal(stdout, "", "stdout should be empty when --result-file is used");
+
+  const parsed = JSON.parse(await readFile(resultFile, "utf8"));
+  assert.equal(parsed.cid, "bafy-result-file-test");
+  assert.equal(parsed.recipients, "2");
+  assert.ok(parsed.root);
+  assert.ok(parsed.artifactPath);
 });

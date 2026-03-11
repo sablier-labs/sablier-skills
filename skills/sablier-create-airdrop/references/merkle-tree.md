@@ -73,7 +73,7 @@ This requires Node.js. No Rust toolchain or local `merkle-api` process is needed
 
 ### Obtain a Pinata JWT
 
-The local generator pins the campaign JSON to IPFS through Pinata's JSON upload endpoint.
+The local generator uploads the campaign JSON artifact to IPFS through Pinata's v3 Files API on the public network.
 
 Ask the user to open the Pinata API keys page at [https://app.pinata.cloud/developers/api-keys](https://app.pinata.cloud/developers/api-keys), create an API key, and copy the JWT as:
 
@@ -84,15 +84,16 @@ Inform the user they only need `Write` permission for the `Files` resource.
 ## 4) Run the Local Generator and Parse Its Output
 
 ```bash
-GENERATOR_OUTPUT=$(PINATA_JWT="$PINATA_JWT" \
+PINATA_JWT="$PINATA_JWT" \
   node "skills/sablier-create-airdrop/scripts/generate-merkle-campaign.mjs" \
     --csv-file "$CSV_FILE" \
-    --decimals "$DECIMALS")
+    --decimals "$DECIMALS" \
+    --result-file /tmp/sablier-merkle-result.json
 ```
 
 **On success:**
 
-The CLI prints JSON to stdout:
+The CLI writes JSON to `/tmp/sablier-merkle-result.json`:
 
 ```json
 {
@@ -104,14 +105,14 @@ The CLI prints JSON to stdout:
 }
 ```
 
-Parse the response:
+Parse the result file:
 
 ```bash
-MERKLE_ROOT=$(echo "$GENERATOR_OUTPUT" | jq -r '.root')
-IPFS_CID=$(echo "$GENERATOR_OUTPUT" | jq -r '.cid')
-AGGREGATE_AMOUNT=$(echo "$GENERATOR_OUTPUT" | jq -r '.total')
-RECIPIENT_COUNT=$(echo "$GENERATOR_OUTPUT" | jq -r '.recipients')
-ARTIFACT_PATH=$(echo "$GENERATOR_OUTPUT" | jq -r '.artifactPath')
+MERKLE_ROOT=$(jq -r '.root' /tmp/sablier-merkle-result.json)
+IPFS_CID=$(jq -r '.cid' /tmp/sablier-merkle-result.json)
+AGGREGATE_AMOUNT=$(jq -r '.total' /tmp/sablier-merkle-result.json)
+RECIPIENT_COUNT=$(jq -r '.recipients' /tmp/sablier-merkle-result.json)
+ARTIFACT_PATH=$(jq -r '.artifactPath' /tmp/sablier-merkle-result.json)
 ```
 
 - `root` — the Merkle root (`bytes32`) for the campaign's `merkleRoot` parameter.
@@ -142,6 +143,7 @@ Diagnose before stopping:
 
 - Is `PINATA_JWT` set?
 - Is the JWT valid in Pinata?
+- Does the key have `Write` permission for the `Files` resource?
 - Is the CSV valid per the [format above](#csv-format)?
 
 Do not proceed with campaign deployment until the generator returns all four deployment values successfully.

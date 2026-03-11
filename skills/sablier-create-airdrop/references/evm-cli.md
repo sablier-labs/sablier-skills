@@ -521,14 +521,15 @@ npm install --prefix "skills/sablier-create-airdrop/scripts"
 # Generate the Merkle tree locally (see merkle-tree.md for full setup)
 CSV_FILE="/path/to/recipients.csv"   # User-provided file path
 DECIMALS=$(cast call "$TOKEN" "decimals()(uint8)" --rpc-url "$RPC_URL")
-GENERATOR_OUTPUT=$(PINATA_JWT="$PINATA_JWT" \
+PINATA_JWT="$PINATA_JWT" \
   node "skills/sablier-create-airdrop/scripts/generate-merkle-campaign.mjs" \
     --csv-file "$CSV_FILE" \
-    --decimals "$DECIMALS")
-MERKLE_ROOT=$(echo "$GENERATOR_OUTPUT" | jq -r '.root')
-IPFS_CID=$(echo "$GENERATOR_OUTPUT" | jq -r '.cid')
-AGGREGATE_AMOUNT=$(echo "$GENERATOR_OUTPUT" | jq -r '.total')
-RECIPIENT_COUNT=$(echo "$GENERATOR_OUTPUT" | jq -r '.recipients')
+    --decimals "$DECIMALS" \
+    --result-file /tmp/sablier-merkle-result.json
+MERKLE_ROOT=$(jq -r '.root' /tmp/sablier-merkle-result.json)
+IPFS_CID=$(jq -r '.cid' /tmp/sablier-merkle-result.json)
+AGGREGATE_AMOUNT=$(jq -r '.total' /tmp/sablier-merkle-result.json)
+RECIPIENT_COUNT=$(jq -r '.recipients' /tmp/sablier-merkle-result.json)
 
 # Campaign starts in 24 hours, no expiration
 START_TIME=$(echo "$(date +%s) + 86400" | bc)

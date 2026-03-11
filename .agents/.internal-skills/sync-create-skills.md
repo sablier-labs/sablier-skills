@@ -4,12 +4,12 @@ Review the workflow docs for `sablier-create-vesting`, `sablier-create-open-ende
 
 Work only in these six files:
 
-- `skills/sablier-create-vesting/SKILL.md`
-- `skills/sablier-create-vesting/references/evm-cli.md`
-- `skills/sablier-create-open-ended-stream/SKILL.md`
-- `skills/sablier-create-open-ended-stream/references/evm-cli.md`
 - `skills/sablier-create-airdrop/SKILL.md`
 - `skills/sablier-create-airdrop/references/evm-cli.md`
+- `skills/sablier-create-open-ended-stream/SKILL.md`
+- `skills/sablier-create-open-ended-stream/references/evm-cli.md`
+- `skills/sablier-create-vesting/SKILL.md`
+- `skills/sablier-create-vesting/references/evm-cli.md`
 
 ## Workflow
 

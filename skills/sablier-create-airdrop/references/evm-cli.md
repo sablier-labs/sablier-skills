@@ -111,7 +111,6 @@ Use the [decision tree in SKILL.md](#choosing-a-campaign-type) to select the cam
 | "airdrop tokens immediately", "instant distribution"                | **Instant**   |
 | "airdrop with vesting", "linear vesting airdrop", "cliff + vesting" | **MerkleLL**  |
 | "airdrop with monthly unlocks", "quarterly vesting", "step unlocks" | **MerkleLT**  |
-| "early claimers forfeit", "variable claim", "incentivize waiting"   | **MerkleVCA** |
 
 - If ambiguous, ask the user to clarify using the decision tree.
 
@@ -126,7 +125,6 @@ Each campaign type has a dedicated factory:
 | Instant       | `SablierFactoryMerkleInstant` |
 | Linear (LL)   | `SablierFactoryMerkleLL`      |
 | Tranched (LT) | `SablierFactoryMerkleLT`      |
-| VCA           | `SablierFactoryMerkleVCA`     |
 
 Also look up:
 
@@ -145,7 +143,7 @@ Collect these from the user before generating the Merkle tree or building any tr
 - factory contract address (from step 2)
 - `campaignName`
 - `campaignStartTime` (Unix timestamp when claims open; `0` for immediate)
-- `expiration` (Unix timestamp; `0` for never — except VCA which requires expiration)
+- `expiration` (Unix timestamp; `0` for never)
 - `initialAdmin` (address authorized to clawback; defaults to sender if not specified)
 
 **Type-specific inputs:**
@@ -155,7 +153,6 @@ Collect these from the user before generating the Merkle tree or building any tr
 | Instant       | None                                                                                                                                                                                |
 | MerkleLL      | `lockup` address, `cancelable`, `transferable`, `shape`, `totalDuration`, `cliffDuration`, `cliffUnlockPercentage` (UD60x18), `startUnlockPercentage` (UD60x18), `vestingStartTime` |
 | MerkleLT      | `lockup` address, `cancelable`, `transferable`, `shape`, `tranchesWithPercentages` array (each: `unlockPercentage` as UD2x18, `duration`), `vestingStartTime`                       |
-| MerkleVCA     | `unlockPercentage` (UD60x18), `vestingStartTime`, `vestingEndTime`                                                                                                                  |
 
 ### 4) Collect Recipient Data and Generate Merkle Tree
 
@@ -295,7 +292,7 @@ Present a human-readable summary of all three transactions:
 - **Function:** `createMerkle*` (type-specific)
 - **Campaign name, type, token, start time, expiration**
 - **Merkle root, IPFS CID, recipient count, aggregate amount**
-- **Vesting parameters** (for LL/LT/VCA)
+- **Vesting parameters** (for LL/LT)
 
 **Transaction 2 — Creation Fee:**
 
@@ -379,7 +376,11 @@ After all three transactions are confirmed, inform the user they can view and ma
 
 ## Entrypoint Catalog
 
-Maps each campaign type to the correct factory function and calldata encoding. Refer to ABI definitions in [merkle-factory-v2.0-abi.json](../assets/merkle-factory-v2.0-abi.json) for exact tuple encoding.
+Maps each campaign type to the correct factory function and calldata encoding. Refer to the per-factory ABI definitions for exact tuple encoding:
+
+- [factory-merkle-instant-v2.0-abi.json](../assets/factory-merkle-instant-v2.0-abi.json)
+- [factory-merkle-LL-v2.0-abi.json](../assets/factory-merkle-LL-v2.0-abi.json)
+- [factory-merkle-LT-v2.0-abi.json](../assets/factory-merkle-LT-v2.0-abi.json)
 
 ### `createMerkleInstant`
 
@@ -444,7 +445,7 @@ createMerkleLT(
 - **lockup** — `SablierLockup` contract address
 - **vestingStartTime** — same behavior as MerkleLL
 
-**Note on percentage types:** MerkleLT uses `UD2x18` (`uint64`), while MerkleLL and MerkleVCA use `UD60x18` (`uint256`). Both use `1e18 = 100%`.
+**Note on percentage types:** MerkleLT uses `UD2x18` (`uint64`), while MerkleLL uses `UD60x18` (`uint256`). Both use `1e18 = 100%`.
 
 **Validation rules:**
 
@@ -457,33 +458,6 @@ Use the factory's helper to verify percentages sum to 100%:
 ```bash
 cast call "$FACTORY" "isPercentagesSum100((uint64,uint40)[])" "$TRANCHES" --rpc-url "$RPC_URL"
 ```
-
-### `createMerkleVCA`
-
-Deploys a campaign where recipients can claim at any time during the vesting period but only receive the vested portion — unvested tokens are forfeited. Waiting until the end yields the full amount.
-
-```
-createMerkleVCA(
-  (string campaignName, uint40 campaignStartTime, uint40 expiration, address initialAdmin, string ipfsCID, bytes32 merkleRoot, address token, uint256 unlockPercentage, uint40 vestingEndTime, uint40 vestingStartTime),
-  uint256 aggregateAmount,
-  uint256 recipientCount
-)
-```
-
-**Key parameters:**
-
-- **unlockPercentage** — `UD60x18` from [PRBMath](https://github.com/PaulRBerg/prb-math) (`uint256`, `1e18` = 100%); fraction available immediately
-- **vestingStartTime** — must be > 0 (required)
-- **vestingEndTime** — must be > `vestingStartTime` (required)
-- **expiration** — must be > 0 and >= `vestingEndTime + 1 week` (recipients need time to claim after vesting ends)
-
-**Validation rules:**
-
-- `vestingStartTime > 0`
-- `vestingEndTime > vestingStartTime`
-- `expiration > 0`
-- `expiration >= vestingEndTime + 1 week`
-- `unlockPercentage <= 1e18`
 
 ### Deterministic Addresses (`compute*`)
 
@@ -513,15 +487,6 @@ computeMerkleLL(
 computeMerkleLT(
   address campaignCreator,
   (string campaignName, uint40 campaignStartTime, bool cancelable, uint40 expiration, address initialAdmin, string ipfsCID, address lockup, bytes32 merkleRoot, string shape, address token, (uint64 unlockPercentage, uint40 duration)[] tranchesWithPercentages, bool transferable, uint40 vestingStartTime)
-) → address
-```
-
-**`computeMerkleVCA`:**
-
-```
-computeMerkleVCA(
-  address campaignCreator,
-  (string campaignName, uint40 campaignStartTime, uint40 expiration, address initialAdmin, string ipfsCID, bytes32 merkleRoot, address token, uint256 unlockPercentage, uint40 vestingEndTime, uint40 vestingStartTime)
 ) → address
 ```
 

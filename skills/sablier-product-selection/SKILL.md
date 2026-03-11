@@ -17,9 +17,9 @@ Sablier offers three products for onchain token distribution. This skill helps c
 
 **Creation skills:**
 
-- Lockup streams (LL, LD, LT) → `sablier-create-vesting`
-- Flow streams → `sablier-create-open-ended-stream`
-- Merkle Airdrops → `sablier-create-airdrop`
+- Lockup/vesting streams → `sablier-create-vesting`
+- Flow/open-ended streams → `sablier-create-open-ended-stream`
+- Airdrops → `sablier-create-airdrop`
 
 ## Decision Tree
 

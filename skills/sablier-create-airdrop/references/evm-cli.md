@@ -2,7 +2,7 @@
 
 ## Overview
 
-This guide is runbook-first: plan the campaign, generate the Merkle tree, run preflight checks, preview the transactions, require explicit confirmation, then deploy, pay the fee, and fund.
+This guide is runbook-first: plan the campaign, generate the Merkle tree, run preflight checks, preview the transactions, require explicit confirmation, then deploy and fund.
 
 **Prerequisites:** This runbook requires `cast`, `curl`, and `jq` (checked in [CLI Prerequisites](#cli-prerequisites-check)). Merkle tree generation requires a running instance of the [Sablier Merkle API](https://github.com/sablier-labs/merkle-api) with [Pinata](https://www.pinata.cloud/) IPFS credentials — the agent sets this up automatically (see [merkle-tree.md](merkle-tree.md)).
 
@@ -15,9 +15,8 @@ Use this sequence for every campaign creation:
 3. Build and show a human-readable transaction preview (no broadcast).
 4. Require explicit user confirmation.
 5. Deploy the campaign via the factory with `cast send`, wait/poll up to 5 minutes for the confirmed receipt.
-6. Send the creation fee to the comptroller, wait/poll up to 5 minutes for the confirmed receipt.
-7. Fund the campaign by transferring tokens to the deployed campaign address, wait/poll up to 5 minutes for the confirmed receipt.
-8. Direct the user to [app.sablier.com](https://app.sablier.com).
+6. Fund the campaign by transferring tokens to the deployed campaign address, wait/poll up to 5 minutes for the confirmed receipt.
+7. Direct the user to [app.sablier.com](https://app.sablier.com).
 
 ## Mandatory Guardrails
 
@@ -66,7 +65,7 @@ Never broadcast before explicit user confirmation.
 
 ### Receipt Wait Timeout (Mandatory)
 
-For every broadcasted transaction (factory deploy, fee transfer, and token funding), wait/poll for a confirmed receipt for up to **5 minutes** before treating the transaction as failed or unconfirmed.
+For every broadcasted transaction (factory deploy and token funding), wait/poll for a confirmed receipt for up to **5 minutes** before treating the transaction as failed or unconfirmed.
 
 Use this polling pattern for receipt verification:
 
@@ -104,7 +103,7 @@ Complete these steps in order before building calldata.
 
 ### 1) Choose Campaign Type
 
-Use the [decision tree in SKILL.md](#choosing-a-campaign-type) to select the campaign type:
+Use the [decision tree in SKILL.md](../SKILL.md#choosing-a-campaign-type) to select the campaign type:
 
 | Signal                                                              | Campaign Type |
 | ------------------------------------------------------------------- | ------------- |
@@ -181,10 +180,9 @@ Do not proceed to preflight checks without all four values.
 
 ```
 1. CREATE    → Deploy campaign via factory
-2. FEE       → Send creation fee to comptroller
-3. FUND      → Transfer tokens to the campaign contract
-4. CLAIMS    → Recipients claim with Merkle proofs (after campaignStartTime)
-5. CLAWBACK  → (optional) Admin recovers unclaimed tokens after expiration
+2. FUND      → Transfer tokens to the campaign contract
+3. CLAIMS    → Recipients claim with Merkle proofs (after campaignStartTime)
+4. CLAWBACK  → (optional) Admin recovers unclaimed tokens after expiration
 ```
 
 **Clawback** is allowed up until 7 days have passed since the first claim, and after the campaign has expired. It is blocked in between.
@@ -199,7 +197,7 @@ Check `balanceOf(owner)` is at least the `aggregateAmount`. If balance is insuff
 
 ### Native Gas Balance for Every Transaction
 
-Before broadcasting, estimate the gas cost and verify the sender can cover gas for all three transactions (factory call, fee transfer, and token funding):
+Before broadcasting, estimate the gas cost and verify the sender can cover gas for both transactions (factory call and token funding):
 
 ```bash
 # Estimate gas for the factory call
@@ -210,9 +208,9 @@ GAS_ESTIMATE=$(cast estimate "$FACTORY" "$FUNCTION_SIG" $FUNCTION_ARGS \
 # Get current gas price (in wei)
 GAS_PRICE=$(cast gas-price --rpc-url "$RPC_URL")
 
-# Total native token needed ≈ (gas estimate × gas price × 3 transactions) + FEE_AMOUNT
+# Total native token needed ≈ gas estimate × gas price × 2 transactions
 # This is a rough estimate — the actual gas per transaction varies
-TOTAL_NEEDED=$(echo "$GAS_ESTIMATE * $GAS_PRICE * 3 + $FEE_AMOUNT" | bc)
+TOTAL_NEEDED=$(echo "$GAS_ESTIMATE * $GAS_PRICE * 2" | bc)
 ```
 
 Compare `TOTAL_NEEDED` against the sender's native balance. If balance is insufficient, stop and tell the user to fund their wallet first. Recommend buying via [Transak](https://transak.com/buy).
@@ -230,43 +228,6 @@ cast balance "$OWNER" --rpc-url "$RPC_URL"
 cast call "$TOKEN" "balanceOf(address)(uint256)" "$OWNER" --rpc-url "$RPC_URL"
 ```
 
-## Creation Fee
-
-The creation fee is approximately **~$2 USD** worth of the chain's native asset. The factory functions are **not payable** — send the fee as a separate native token transfer to the comptroller contract.
-
-**Resolving the fee recipient:**
-
-The fee recipient is the comptroller contract. Query it from the factory:
-
-```bash
-COMPTROLLER=$(cast call "$FACTORY" "comptroller()(address)" --rpc-url "$RPC_URL")
-```
-
-This is the same address that receives claim-time fees from recipients.
-
-**Calculating the fee amount:**
-
-Look up the `FEE_AMOUNT` for the chain's native asset from this table (~$2 USD):
-
-| Native Asset | ~Amount    | FEE_AMOUNT (wei)        |
-| ------------ | ---------- | ----------------------- |
-| ETH          | 0.001 ETH  | `1000000000000000`      |
-| AVAX         | 0.22 AVAX  | `220000000000000000`    |
-| BERA         | 3.8 BERA   | `3800000000000000000`   |
-| BNB          | 0.0032 BNB | `3200000000000000`      |
-| CHZ          | 50 CHZ     | `50000000000000000000`  |
-| CORE         | 25 CORE    | `25000000000000000000`  |
-| HYPE         | 0.064 HYPE | `64000000000000000`     |
-| MON          | 100 MON    | `100000000000000000000` |
-| POL          | 20 POL     | `20000000000000000000`  |
-| S            | 50 S       | `50000000000000000000`  |
-| SEI          | 28 SEI     | `28000000000000000000`  |
-| WATT         | 0 WATT     | `0`                     |
-| xDAI         | 2 xDAI     | `2000000000000000000`   |
-| XDC          | 58 XDC     | `58000000000000000000`  |
-
-> These values are approximate as of March 2026. If a value seems outdated, use web search to find the current price and recalculate as `cast to-wei $(echo "scale=18; 2 / $PRICE" | bc) ether`.
-
 ## Execution Runbook
 
 ### 1) Resolve RPC URL, signing method, and sender address
@@ -280,11 +241,11 @@ OWNER=$(cast wallet address --browser)
 
 ### 2) Run preflight checks
 
-Run all checks from [Preflight Checks](#preflight-checks). Calculate `FEE_AMOUNT` per the [Creation Fee](#creation-fee) section.
+Run all checks from [Preflight Checks](#preflight-checks).
 
 ### 3) Preview All Transactions (No Broadcast)
 
-Present a human-readable summary of all three transactions:
+Present a human-readable summary of both transactions:
 
 **Transaction 1 — Deploy Campaign:**
 
@@ -294,12 +255,7 @@ Present a human-readable summary of all three transactions:
 - **Merkle root, IPFS CID, recipient count, aggregate amount**
 - **Vesting parameters** (for LL/LT)
 
-**Transaction 2 — Creation Fee:**
-
-- **To:** comptroller (`$COMPTROLLER`)
-- **Amount:** ~$2 USD in native token (`FEE_AMOUNT`)
-
-**Transaction 3 — Fund Campaign:**
+**Transaction 2 — Fund Campaign:**
 
 - **Contract:** `$TOKEN`
 - **Function:** `transfer(address,uint256)`
@@ -341,22 +297,9 @@ TX_HASH=$(cast send "$FACTORY" "$FUNCTION_SIG" $FUNCTION_ARGS \
 
 Wait/poll up to 5 minutes for the confirmed receipt per [Receipt Wait Timeout (Mandatory)](#receipt-wait-timeout-mandatory) before proceeding.
 
-If `--browser` fails at runtime, ask the user to provide a private key and retry with `--private-key`. The same fallback applies to all transactions below.
+If `--browser` fails at runtime, ask the user to provide a private key and retry with `--private-key`. The same fallback applies to the funding transaction below.
 
-### 6) Send Creation Fee
-
-```bash
-TX_HASH=$(cast send "$COMPTROLLER" \
-  --value "$FEE_AMOUNT" \
-  --rpc-url "$RPC_URL" \
-  --from "$OWNER" \
-  --browser \
-  --async)
-```
-
-Wait/poll up to 5 minutes for the confirmed receipt before proceeding.
-
-### 7) Fund the Campaign
+### 6) Fund the Campaign
 
 Transfer the aggregate token amount to the deployed campaign address:
 
@@ -370,9 +313,9 @@ TX_HASH=$(cast send "$TOKEN" "transfer(address,uint256)" "$CAMPAIGN" "$AGGREGATE
 
 Wait/poll up to 5 minutes for the confirmed receipt.
 
-### 8) Direct User to the Sablier App
+### 7) Direct User to the Sablier App
 
-After all three transactions are confirmed, inform the user they can view and manage the campaign at [app.sablier.com](https://app.sablier.com).
+After both transactions are confirmed, inform the user they can view and manage the campaign at [app.sablier.com](https://app.sablier.com).
 
 ## Entrypoint Catalog
 
@@ -415,7 +358,7 @@ createMerkleLL(
 **Key parameters:**
 
 - **cliffDuration** — seconds; `0` for no cliff
-- **cliffUnlockPercentage** — `UD60x18` from [PRBMath](https://github.com/PaulRBerg/prb-math) (`uint256`, `1e18` = 100%); fraction unlocked after cliff
+- **cliffUnlockPercentage** — `UD60x18` from PRBMath (`uint256`, `1e18` = 100%); fraction unlocked after cliff
 - **startUnlockPercentage** — `UD60x18` (`uint256`, `1e18` = 100%); fraction unlocked immediately at stream start
 - **lockup** — `SablierLockup` contract address (look up at [Lockup Deployments](https://docs.sablier.com/guides/lockup/deployments.md))
 - **vestingStartTime** — `0` means vesting starts at each individual claim's `block.timestamp`; non-zero means all recipients vest from the same absolute timestamp
@@ -441,7 +384,7 @@ createMerkleLT(
 
 **Key parameters:**
 
-- **tranchesWithPercentages** — array of `(unlockPercentage, duration)` tuples. `unlockPercentage` uses `UD2x18` from [PRBMath](https://github.com/PaulRBerg/prb-math) (`uint64`, `1e18` = 100%). `duration` is seconds.
+- **tranchesWithPercentages** — array of `(unlockPercentage, duration)` tuples. `unlockPercentage` uses `UD2x18` from PRBMath (`uint64`, `1e18` = 100%). `duration` is seconds.
 - **lockup** — `SablierLockup` contract address
 - **vestingStartTime** — same behavior as MerkleLL
 
@@ -504,7 +447,6 @@ Deploy an instant airdrop of 10,000 USDC (6 decimals) to 50 recipients on Ethere
 FACTORY="<factory-merkle-instant-address>"   # From Airdrop Deployments page
 RPC_URL="<resolved-or-user-provided-rpc>"
 TOKEN="0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"  # USDC on Ethereum
-COMPTROLLER=$(cast call "$FACTORY" "comptroller()(address)" --rpc-url "$RPC_URL")
 OWNER=$(cast wallet address --browser)
 
 # Generate Merkle tree via API (see merkle-tree.md for full setup)
@@ -521,8 +463,6 @@ RECIPIENT_COUNT=$(echo "$RESPONSE" | jq -r '.recipients')
 
 # Campaign starts in 24 hours, no expiration
 START_TIME=$(echo "$(date +%s) + 86400" | bc)
-
-# Calculate FEE_AMOUNT per the "Creation Fee" section (~$2 USD)
 
 # Predict campaign address via compute function
 COMPUTE_SIG="computeMerkleInstant(address,(string,uint40,uint40,address,string,bytes32,address))"
@@ -542,16 +482,7 @@ TX_HASH=$(cast send "$FACTORY" "$FUNCTION_SIG" \
   --async)
 # Wait/poll up to 5 minutes for confirmed receipt
 
-# 2. Send creation fee
-TX_HASH=$(cast send "$COMPTROLLER" \
-  --value "$FEE_AMOUNT" \
-  --rpc-url "$RPC_URL" \
-  --from "$OWNER" \
-  --browser \
-  --async)
-# Wait/poll up to 5 minutes for confirmed receipt
-
-# 3. Fund campaign
+# 2. Fund campaign
 TX_HASH=$(cast send "$TOKEN" "transfer(address,uint256)" "$CAMPAIGN" "$AGGREGATE_AMOUNT" \
   --rpc-url "$RPC_URL" \
   --from "$OWNER" \
@@ -564,8 +495,6 @@ Notes:
 
 - `aggregateAmount` is informational — the Merkle tree leaf amounts enforce correctness
 - Fund the campaign before `campaignStartTime` so claims don't fail
-- `FEE_AMOUNT` = ~$2 USD worth of native token (see [Creation Fee](#creation-fee))
-- `MSG_VALUE` is not used — factory functions are not payable; the fee is a separate native transfer
 
 ## Supported Chains
 

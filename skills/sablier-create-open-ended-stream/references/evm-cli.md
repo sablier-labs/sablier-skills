@@ -146,7 +146,7 @@ Infer whether to fund the stream upfront:
 
 ### 3) Calculate Rate Per Second
 
-Convert the user's desired streaming rate into the `UD21x18` format. `UD21x18` is a fixed-point type from the [PRBMath](https://github.com/PaulRBerg/prb-math) library, encoded as `uint128` with 18 decimals of precision.
+Convert the user's desired streaming rate into the `UD21x18` format. `UD21x18` is a fixed-point type from the PRBMath library, encoded as `uint128` with 18 decimals of precision.
 
 **Conversion formula:**
 
@@ -577,7 +577,7 @@ Check these before building calldata. Violating any of them will cause the trans
 
 ## Rate Per Second Reference
 
-The `ratePerSecond` parameter uses the `UD21x18` fixed-point type from [PRBMath](https://github.com/PaulRBerg/prb-math) (encoded as `uint128`) where `1e18` = 1 whole token per second. The contract handles decimal scaling internally — the rate is always expressed in whole tokens regardless of the token's actual decimals.
+The `ratePerSecond` parameter uses the `UD21x18` fixed-point type from PRBMath (encoded as `uint128`) where `1e18` = 1 whole token per second. The contract handles decimal scaling internally — the rate is always expressed in whole tokens regardless of the token's actual decimals.
 
 **Conversion formula:**
 

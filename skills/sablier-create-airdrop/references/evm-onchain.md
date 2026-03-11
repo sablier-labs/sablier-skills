@@ -1,8 +1,8 @@
-# EVM On-Chain Integration
+# EVM OnChain Integration
 
-On-chain integration means creating Merkle airdrop campaigns directly from a Solidity smart contract by calling factory functions. Each campaign type has a dedicated factory contract: `SablierFactoryMerkleInstant`, `SablierFactoryMerkleLL`, `SablierFactoryMerkleLT`, and `SablierFactoryMerkleVCA`. The factory deploys a campaign contract via CREATE2, returning a deterministic address.
+Onchain integration means creating Merkle airdrop campaigns directly from a Solidity smart contract by calling factory functions. Each campaign type has a dedicated factory contract: `SablierFactoryMerkleInstant`, `SablierFactoryMerkleLL`, and `SablierFactoryMerkleLT`. The factory deploys a campaign contract via CREATE2, returning a deterministic address.
 
-MerkleLL and MerkleLT campaigns use percentage-based types from the [PRBMath](https://github.com/PaulRBerg/prb-math) library: `UD60x18` (`uint256`, `1e18` = 100%) for MerkleLL/VCA percentages, and `UD2x18` (`uint64`, `1e18` = 100%) for MerkleLT tranche percentages.
+MerkleLL and MerkleLT campaigns use percentage-based types from the PRBMath library: `UD60x18` (`uint256`, `1e18` = 100%) for MerkleLL/VCA percentages, and `UD2x18` (`uint64`, `1e18` = 100%) for MerkleLT tranche percentages.
 
 Each factory also exposes a `compute*` function to predict the campaign address before deployment.
 

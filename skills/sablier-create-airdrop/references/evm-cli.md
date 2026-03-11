@@ -192,13 +192,21 @@ Do not proceed to preflight checks without all four values.
 
 Run the deployment-side checks before previewing or broadcasting the factory transaction. Run the funding-side checks only if the user chooses `Fund now` after deployment.
 
+Before any deployment-side gas estimate, address prediction, or broadcast, materialize every time-sensitive value exactly once and build the final params tuple once. Reuse the same tuple for `cast estimate`, `compute*`, and `create*`. Do not recompute `campaignStartTime`, `expiration`, or any other dynamic field in a second shell invocation.
+
+```bash
+CAMPAIGN_START_TIME="<unix timestamp or 0>"
+EXPIRATION="<unix timestamp or 0>"
+PARAMS="(<type-specific tuple using those exact values>)"
+```
+
 ### Native Gas Balance for the Deployment Transaction
 
 Before broadcasting the factory call, estimate the gas cost and verify the sender can cover it:
 
 ```bash
 # Estimate gas for the factory call
-GAS_ESTIMATE=$(cast estimate "$FACTORY" "$FUNCTION_SIG" $FUNCTION_ARGS \
+GAS_ESTIMATE=$(cast estimate "$FACTORY" "$FUNCTION_SIG" "$PARAMS" "$AGGREGATE_AMOUNT" "$RECIPIENT_COUNT" \
   --rpc-url "$RPC_URL" \
   --from "$OWNER")
 
@@ -293,16 +301,18 @@ If the user does not explicitly confirm with `YES`, stop.
 
 ### 5) Deploy Campaign
 
+Reuse the previously built `PARAMS` tuple for both `compute*` and `create*`.
+
 First, predict the campaign address using the factory's `compute*` function:
 
 ```bash
-CAMPAIGN=$(cast call "$FACTORY" "$COMPUTE_SIG" $COMPUTE_ARGS --rpc-url "$RPC_URL")
+CAMPAIGN=$(cast call "$FACTORY" "$COMPUTE_SIG" "$OWNER" "$PARAMS" --rpc-url "$RPC_URL")
 ```
 
 Then deploy. A browser tab will open for the user to approve the transaction in their wallet extension.
 
 ```bash
-TX_HASH=$(cast send "$FACTORY" "$FUNCTION_SIG" $FUNCTION_ARGS \
+TX_HASH=$(cast send "$FACTORY" "$FUNCTION_SIG" "$PARAMS" "$AGGREGATE_AMOUNT" "$RECIPIENT_COUNT" \
   --rpc-url "$RPC_URL" \
   --from "$OWNER" \
   --browser \
@@ -499,7 +509,7 @@ computeMerkleLT(
 ) → address
 ```
 
-The `campaignCreator` is the `msg.sender` of the `createMerkle*` call — use the sender's wallet address. The params tuple is identical to the one passed to the corresponding `createMerkle*` function.
+The `campaignCreator` is the `msg.sender` of the `createMerkle*` call — use the sender's wallet address. The params tuple must be byte-for-byte identical to the one passed to the corresponding `createMerkle*` function. For time-derived values like `campaignStartTime` and `expiration`, compute them once, store them in shell variables, build one params tuple, and reuse that tuple in both calls. If any tuple field changes, the predicted address is no longer valid.
 
 ## Worked Examples
 
@@ -531,20 +541,23 @@ IPFS_CID=$(jq -r '.cid' /tmp/sablier-merkle-result.json)
 AGGREGATE_AMOUNT=$(jq -r '.total' /tmp/sablier-merkle-result.json)
 RECIPIENT_COUNT=$(jq -r '.recipients' /tmp/sablier-merkle-result.json)
 
-# Campaign starts in 24 hours, no expiration
-START_TIME=$(echo "$(date +%s) + 86400" | bc)
+# Campaign starts in 24 hours, no expiration.
+# If using a finite expiration instead, compute it once here and reuse it below.
+START_TIME=$(($(date +%s) + 86400))
+EXPIRATION=0
+MERKLE_PARAMS="(\"My Airdrop\",$START_TIME,$EXPIRATION,$OWNER,\"$IPFS_CID\",$MERKLE_ROOT,$TOKEN)"
 
 # Predict campaign address via compute function
 COMPUTE_SIG="computeMerkleInstant(address,(string,uint40,uint40,address,string,bytes32,address))"
 CAMPAIGN=$(cast call "$FACTORY" "$COMPUTE_SIG" \
   "$OWNER" \
-  "(\"My Airdrop\",$START_TIME,0,$OWNER,\"$IPFS_CID\",$MERKLE_ROOT,$TOKEN)" \
+  "$MERKLE_PARAMS" \
   --rpc-url "$RPC_URL")
 
 # 1. Deploy campaign
 FUNCTION_SIG="createMerkleInstant((string,uint40,uint40,address,string,bytes32,address),uint256,uint256)"
 TX_HASH=$(cast send "$FACTORY" "$FUNCTION_SIG" \
-  "(\"My Airdrop\",$START_TIME,0,$OWNER,\"$IPFS_CID\",$MERKLE_ROOT,$TOKEN)" \
+  "$MERKLE_PARAMS" \
   "$AGGREGATE_AMOUNT" "$RECIPIENT_COUNT" \
   --rpc-url "$RPC_URL" \
   --from "$OWNER" \

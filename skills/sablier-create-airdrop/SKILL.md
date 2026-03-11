@@ -76,7 +76,7 @@ If any of the following are missing or ambiguous from the user's input, use the 
 - Recipient list (file path to a CSV, or pasted inline for small lists)
 - Token address
 - Campaign start time (when claims open)
-- Expiration (when unclaimed tokens can be recovered; `0` for never)
+- Expiration (when unclaimed tokens can be recovered by admin): ask user to choose between 90 days, 30 days, or never (set as `0` in the factory call)
 - Vesting schedule (for LL: duration and cliff; for LT: tranche intervals)
 
 If the missing detail is the token address, tell the user they can look it up on a blockchain explorer such as Etherscan.

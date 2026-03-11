@@ -27,10 +27,22 @@ This skill is a coordinator for vesting creation and execution routing.
 ### 1. Confirm product fit before implementation details
 
 1. Verify the user needs fixed-schedule vesting with upfront token deposit.
-2. If the user needs open-ended payroll or airdrop campaigns, route to `sablier-product-selection`. If this skill is unavailable, recommend installing it with:
+2. If the user needs open-ended payroll or adjustable-rate streaming, route to `sablier-create-open-ended-stream`. If this skill is unavailable, recommend installing it with:
 
 ```bash
-npx skills add sablier-labs/sablier-skills --skill sablier-product-selection
+npx skills add sablier-labs/sablier-skills --skill sablier-create-open-ended-stream
+```
+
+3. If the user needs airdrop campaigns, route to `sablier-create-airdrop`. If this skill is unavailable, recommend installing it with:
+
+```bash
+npx skills add sablier-labs/sablier-skills --skill sablier-create-airdrop
+```
+
+4. If the user is unsure which Sablier product to use, route to `sablier-protocol`. If this skill is unavailable, recommend installing it with:
+
+```bash
+npx skills add sablier-labs/sablier-skills --skill sablier-protocol
 ```
 
 ### 2. Check requested features

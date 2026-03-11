@@ -1,6 +1,6 @@
 # Sablier Skills
 
-Installable AI agent skills for Sablier workflows. This catalog covers product selection, protocol context, fixed-schedule vesting, open-ended payroll streams, and Merkle airdrop creation.
+Installable AI agent skills for Sablier workflows. This catalog covers protocol context, fixed-schedule vesting, open-ended payroll streams, and Merkle airdrop creation.
 
 ## Install
 
@@ -29,7 +29,7 @@ Pass `-g` to install globally.
 Once installed, call a skill explicitly or let the agent route automatically.
 
 ```text
-Use sablier-product-selection: I need to distribute tokens to 8,000 wallets and let recipients claim individually.
+Use sablier-protocol: Which Sablier product fits a distribution to 8,000 wallets where recipients claim individually?
 
 Use sablier-create-vesting: Create a 4-year vesting stream with a 12-month cliff on Arbitrum for 0x...
 
@@ -47,7 +47,6 @@ Use sablier-protocol: Explain the difference between Lockup, Flow, and Airdrops.
 | `sablier-create-airdrop`           | Create Merkle airdrop campaigns from recipient CSVs                  | Sablier Airdrops, EVM        |
 | `sablier-create-open-ended-stream` | Create open-ended token payment streams with a configurable rate     | Sablier Flow, EVM            |
 | `sablier-create-vesting`           | Create fixed-schedule vesting streams with upfront funding           | Sablier Lockup, EVM + Solana |
-| `sablier-product-selection`        | Choose between Lockup, Flow, and Airdrops before implementation      | Advisory / routing           |
 | `sablier-protocol`                 | Explain the Sablier product surface and common distribution patterns | Advisory / context           |
 
 ## Repo Structure
@@ -57,7 +56,6 @@ skills/
   sablier-create-airdrop/
   sablier-create-open-ended-stream/
   sablier-create-vesting/
-  sablier-product-selection/
   sablier-protocol/
 justfile
 README.md

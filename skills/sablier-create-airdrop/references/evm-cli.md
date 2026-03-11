@@ -2,7 +2,7 @@
 
 ## Overview
 
-This guide is runbook-first: plan the campaign, generate the Merkle tree, run preflight checks, preview the transactions, require explicit confirmation, then deploy and fund.
+This guide is runbook-first: plan the campaign, generate the Merkle tree, run preflight checks, preview the deployment, require explicit confirmation, deploy the campaign, then use `AskUserQuestion` to decide whether to fund immediately or later.
 
 **Prerequisites:** This runbook requires `cast`, `jq`, and `node` (checked in [CLI Prerequisites](#cli-prerequisites-check)). Merkle tree generation uses the local helper in `skills/sablier-create-airdrop/scripts` plus a single Pinata JWT for IPFS publication (see [merkle-tree.md](merkle-tree.md)).
 
@@ -11,12 +11,13 @@ This guide is runbook-first: plan the campaign, generate the Merkle tree, run pr
 Use this sequence for every campaign creation:
 
 1. Complete [Intake & Planning Inputs](#intake--planning-inputs): campaign type, chain, inputs, and Merkle tree generation.
-2. Run all [Preflight Checks](#preflight-checks), including token balance and native gas balance.
-3. Build and show a human-readable transaction preview (no broadcast).
-4. Require explicit user confirmation.
-5. Deploy the campaign via the factory with `cast send`, wait/poll up to 5 minutes for the confirmed receipt.
-6. Fund the campaign by transferring tokens to the deployed campaign address, wait/poll up to 5 minutes for the confirmed receipt.
-7. Direct the user to the campaign page on [app.sablier.com](https://app.sablier.com).
+2. Run the deployment-focused [Preflight Checks](#preflight-checks).
+3. Build and show a human-readable deployment preview (no broadcast).
+4. Require explicit user confirmation for deployment.
+5. Deploy the campaign via the factory with `cast send`, then wait/poll up to 5 minutes for the confirmed receipt.
+6. Use `AskUserQuestion` to ask whether the user wants to fund the campaign now or later.
+7. If the user chooses `Fund now`, run the funding checks and transfer tokens to the campaign, then wait/poll up to 5 minutes for the confirmed receipt.
+8. Exit successfully by sharing the campaign page URL plus campaign metadata. If funding is deferred, clearly warn that claims will fail until the campaign is funded.
 
 ## Mandatory Guardrails
 
@@ -65,7 +66,7 @@ Never broadcast before explicit user confirmation.
 
 ### Receipt Wait Timeout (Mandatory)
 
-For every broadcasted transaction (factory deploy and token funding), wait/poll for a confirmed receipt for up to **5 minutes** before treating the transaction as failed or unconfirmed.
+For every broadcasted transaction (factory deploy and optional token funding), wait/poll for a confirmed receipt for up to **5 minutes** before treating the transaction as failed or unconfirmed.
 
 Use this polling pattern for receipt verification:
 
@@ -174,7 +175,7 @@ Do not proceed to preflight checks without all four values.
 
 **`initialAdmin` can differ from the campaign creator.** The `initialAdmin` is the address authorized to clawback unclaimed tokens — it does not have to be the same address that deploys the campaign. If the user does not specify an admin, default to the sender address.
 
-**Creation and funding are decoupled** — the campaign contract can exist before tokens are deposited. However, claims will fail if the campaign has insufficient token balance, so always fund before `campaignStartTime`.
+**Creation and funding are decoupled** — the campaign contract can exist before tokens are deposited. However, claims will fail if the campaign has insufficient token balance. If the user chooses to defer funding, complete the task after deployment and tell them to fund the campaign before `campaignStartTime`.
 
 ## Campaign Lifecycle
 
@@ -189,15 +190,11 @@ Do not proceed to preflight checks without all four values.
 
 ## Preflight Checks
 
-Run these checks before previewing or broadcasting any transaction.
+Run the deployment-side checks before previewing or broadcasting the factory transaction. Run the funding-side checks only if the user chooses `Fund now` after deployment.
 
-### Token Balance
+### Native Gas Balance for the Deployment Transaction
 
-Check `balanceOf(owner)` is at least the `aggregateAmount`. If balance is insufficient, stop execution and inform the user they need more tokens (for example, purchase via Uniswap) before continuing.
-
-### Native Gas Balance for Every Transaction
-
-Before broadcasting, estimate the gas cost and verify the sender can cover gas for both transactions (factory call and token funding):
+Before broadcasting the factory call, estimate the gas cost and verify the sender can cover it:
 
 ```bash
 # Estimate gas for the factory call
@@ -208,12 +205,34 @@ GAS_ESTIMATE=$(cast estimate "$FACTORY" "$FUNCTION_SIG" $FUNCTION_ARGS \
 # Get current gas price (in wei)
 GAS_PRICE=$(cast gas-price --rpc-url "$RPC_URL")
 
-# Total native token needed ≈ gas estimate × gas price × 2 transactions
-# This is a rough estimate — the actual gas per transaction varies
-TOTAL_NEEDED=$(echo "$GAS_ESTIMATE * $GAS_PRICE * 2" | bc)
+# Total native token needed ≈ gas estimate × gas price
+TOTAL_NEEDED=$(echo "$GAS_ESTIMATE * $GAS_PRICE" | bc)
 ```
 
 Compare `TOTAL_NEEDED` against the sender's native balance. If balance is insufficient, stop and tell the user to fund their wallet first. Recommend buying via [Transak](https://transak.com/buy).
+
+### Funding Checks
+
+Run these only if the user chooses `Fund now` after the deployment receipt is confirmed.
+
+#### Token Balance
+
+Check `balanceOf(owner)` is at least the `aggregateAmount`. If balance is insufficient, stop execution and inform the user they need more tokens (for example, purchase via Uniswap) before continuing with funding.
+
+#### Native Gas Balance for the Funding Transaction
+
+Before broadcasting the ERC-20 transfer, estimate the gas cost and verify the sender can cover it:
+
+```bash
+GAS_ESTIMATE=$(cast estimate "$TOKEN" "transfer(address,uint256)" "$CAMPAIGN" "$AGGREGATE_AMOUNT" \
+  --rpc-url "$RPC_URL" \
+  --from "$OWNER")
+
+GAS_PRICE=$(cast gas-price --rpc-url "$RPC_URL")
+TOTAL_NEEDED=$(echo "$GAS_ESTIMATE * $GAS_PRICE" | bc)
+```
+
+Compare `TOTAL_NEEDED` against the sender's native balance. If balance is insufficient, stop and tell the user to fund their wallet first.
 
 ### Read-Only Validation Commands
 
@@ -239,15 +258,15 @@ RPC_URL="<resolved-or-user-provided-rpc>"
 OWNER=$(cast wallet address --browser)
 ```
 
-### 2) Run preflight checks
+### 2) Run deployment preflight checks
 
-Run all checks from [Preflight Checks](#preflight-checks).
+Run the deployment-side checks from [Preflight Checks](#preflight-checks).
 
-### 3) Preview All Transactions (No Broadcast)
+### 3) Preview the Deployment Transaction (No Broadcast)
 
-Present a human-readable summary of both transactions:
+Present a human-readable summary of the deployment transaction:
 
-**Transaction 1 — Deploy Campaign:**
+**Transaction — Deploy Campaign:**
 
 - **Contract:** `$FACTORY`
 - **Function:** `createMerkle*` (type-specific)
@@ -255,14 +274,9 @@ Present a human-readable summary of both transactions:
 - **Merkle root, IPFS CID, recipient count, aggregate amount**
 - **Vesting parameters** (for LL/LT)
 
-**Transaction 2 — Fund Campaign:**
+Also tell the user that funding is a separate post-deployment step and they will be asked again after deployment whether they want to fund now or later.
 
-- **Contract:** `$TOKEN`
-- **Function:** `transfer(address,uint256)`
-- **To:** deployed campaign address
-- **Amount:** `$AGGREGATE_AMOUNT`
-
-### 4) Require Explicit Confirmation
+### 4) Require Explicit Confirmation for Deployment
 
 Use a clear confirmation flow:
 
@@ -299,9 +313,41 @@ Wait/poll up to 5 minutes for the confirmed receipt per [Receipt Wait Timeout (M
 
 If `--browser` fails at runtime, ask the user to provide a private key and retry with `--private-key`. The same fallback applies to the funding transaction below.
 
-### 6) Fund the Campaign
+### 6) Ask Whether to Fund Now or Later
 
-Transfer the aggregate token amount to the deployed campaign address:
+After the deployment receipt is confirmed, use the `AskUserQuestion` tool to ask whether the user wants to fund the campaign now or later.
+
+Use a question equivalent to:
+
+- **Question:** `The campaign has been deployed. Do you want to fund it now or later?`
+- **Choices:** `Fund now`, `Fund later`
+
+If the user chooses `Fund later`, stop here successfully and share:
+
+- campaign URL: `https://app.sablier.com/airdrops/campaign/${CAMPAIGN}-${CHAIN_ID}`
+- chain name and chain ID
+- campaign type
+- token address
+- aggregate amount
+- recipient count
+- claiming start time (`campaignStartTime`, or `immediate` when `0`)
+- expiration (`expiration`, or `never` when `0`)
+- funding status: `Awaiting funding`
+
+Also warn explicitly that claims will fail until the campaign contract is funded with at least the aggregate amount.
+
+If the user chooses `Fund now`, continue to the next step.
+
+### 7) Fund the Campaign
+
+Before broadcasting, rerun the [Funding Checks](#funding-checks). Then show a short human-readable preview of the funding transfer:
+
+- **Contract:** `$TOKEN`
+- **Function:** `transfer(address,uint256)`
+- **To:** `$CAMPAIGN`
+- **Amount:** `$AGGREGATE_AMOUNT`
+
+Then transfer the aggregate token amount to the deployed campaign address:
 
 ```bash
 TX_HASH=$(cast send "$TOKEN" "transfer(address,uint256)" "$CAMPAIGN" "$AGGREGATE_AMOUNT" \
@@ -313,13 +359,27 @@ TX_HASH=$(cast send "$TOKEN" "transfer(address,uint256)" "$CAMPAIGN" "$AGGREGATE
 
 Wait/poll up to 5 minutes for the confirmed receipt.
 
-### 7) Direct User to the Campaign
+### 8) Direct User to the Campaign
 
-After both transactions are confirmed, present the direct link to the campaign:
+After the successful exit path, present the direct link to the campaign:
 
 ```
 https://app.sablier.com/airdrops/campaign/${CAMPAIGN}-${CHAIN_ID}
 ```
+
+Include this metadata in the final response:
+
+- funding status: `Funded` or `Awaiting funding`
+- campaign type
+- chain name and chain ID
+- token address
+- aggregate amount
+- recipient count
+- claiming start time (`campaignStartTime`, or `immediate` when `0`)
+- expiration (`expiration`, or `never` when `0`)
+- `initialAdmin`
+
+If funding is still pending, add a short warning that recipients cannot claim until the campaign receives enough tokens.
 
 ## Entrypoint Catalog
 

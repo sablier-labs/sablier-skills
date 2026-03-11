@@ -12,6 +12,8 @@ description: This skill should be used when the user asks to create "token airdr
 
 Create token airdrops using the Sablier Merkle system. A campaign creator deploys a campaign contract via a factory, storing a Merkle root. Anyone can then fund the campaign by transferring tokens to it. Recipients claim individually using Merkle proofs, paying their own gas.
 
+Funding does not have to happen in the same session as deployment. For CLI execution, deploy first, then ask whether the user wants to fund immediately or later. If they defer funding, finish successfully after deployment, share the campaign URL plus key metadata, and warn that claims will fail until the campaign holds at least the aggregate amount.
+
 This skill is a coordinator for airdrop campaign creation and execution routing.
 
 ## Arguments
@@ -102,6 +104,15 @@ Do not guess or silently apply defaults for the campaign type, recipient list, o
 | ---------------------------------------------- | ----------------------------------------------- | --------------------------------------------------------------------------------------- |
 | Airdrop campaign creation on the user's behalf | Use [evm-cli.md](references/evm-cli.md)         | Not yet supported. Direct the user to [solana.sablier.com](https://solana.sablier.com). |
 | Onchain integration guidance                   | Use [evm-onchain.md](references/evm-onchain.md) | Not yet supported. Direct the user to [solana.sablier.com](https://solana.sablier.com). |
+
+### 7. Handle funding after deployment
+
+For the EVM CLI route:
+
+1. Deploy the campaign first.
+2. After the deployment receipt is confirmed, use the `AskUserQuestion` tool to ask whether the user wants to fund now or later.
+3. If the user chooses later, treat the deployment as a successful completion, share the campaign URL and core campaign metadata, and warn that claims will fail until the campaign is funded.
+4. If the user chooses now, continue with the token funding transaction.
 
 ## Resources
 

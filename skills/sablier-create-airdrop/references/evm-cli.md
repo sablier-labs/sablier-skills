@@ -151,8 +151,8 @@ Collect these from the user before generating the Merkle tree or building any tr
 | Campaign Type | Additional Inputs                                                                                                                                                                   |
 | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Instant       | None                                                                                                                                                                                |
-| MerkleLL      | `lockup` address, `cancelable`, `transferable`, `shape`, `totalDuration`, `cliffDuration`, `cliffUnlockPercentage` (UD60x18), `startUnlockPercentage` (UD60x18), `vestingStartTime` |
-| MerkleLT      | `lockup` address, `cancelable`, `transferable`, `shape`, `tranchesWithPercentages` array (each: `unlockPercentage` as UD2x18, `duration`), `vestingStartTime`                       |
+| MerkleLL      | `lockup` address, `cancelable`, `transferable`, `shape`, `totalDuration`, `cliffDuration`, `cliffUnlockPercentage` (`uint256`), `startUnlockPercentage` (`uint256`), `vestingStartTime` |
+| MerkleLT      | `lockup` address, `cancelable`, `transferable`, `shape`, `tranchesWithPercentages` array (each: `unlockPercentage` as `uint64`, `duration`), `vestingStartTime`                       |
 
 ### 4) Collect Recipient Data and Generate Merkle Tree
 
@@ -422,8 +422,8 @@ createMerkleLL(
 **Key parameters:**
 
 - **cliffDuration** — seconds; `0` for no cliff
-- **cliffUnlockPercentage** — `UD60x18` from PRBMath (`uint256`, `1e18` = 100%); fraction unlocked after cliff
-- **startUnlockPercentage** — `UD60x18` (`uint256`, `1e18` = 100%); fraction unlocked immediately at stream start
+- **cliffUnlockPercentage** — `uint256`; fraction unlocked after cliff
+- **startUnlockPercentage** — `uint256`; fraction unlocked immediately at stream start
 - **lockup** — `SablierLockup` contract address (look up at [Lockup Deployments](https://docs.sablier.com/guides/lockup/deployments.md))
 - **vestingStartTime** — `0` means vesting starts at each individual claim's `block.timestamp`; non-zero means all recipients vest from the same absolute timestamp
 
@@ -448,11 +448,11 @@ createMerkleLT(
 
 **Key parameters:**
 
-- **tranchesWithPercentages** — array of `(unlockPercentage, duration)` tuples. `unlockPercentage` uses `UD2x18` from PRBMath (`uint64`, `1e18` = 100%). `duration` is seconds.
+- **tranchesWithPercentages** — array of `(unlockPercentage, duration)` tuples. `unlockPercentage` is a `uint64`. `duration` is seconds.
 - **lockup** — `SablierLockup` contract address
 - **vestingStartTime** — same behavior as MerkleLL
 
-**Note on percentage types:** MerkleLT uses `UD2x18` (`uint64`), while MerkleLL uses `UD60x18` (`uint256`). Both use `1e18 = 100%`.
+**Note on percentage encoding:** MerkleLT uses `uint64`, while MerkleLL uses `uint256`. In both cases, `1e18 = 100%`.
 
 **Validation rules:**
 

@@ -14,6 +14,8 @@ Create token airdrops using the Sablier Merkle system. A campaign creator deploy
 
 Funding does not have to happen in the same session as deployment. For CLI execution, deploy first, then ask whether the user wants to fund immediately or later. If they defer funding, finish successfully after deployment, share the campaign URL plus key metadata, and warn that claims will fail until the campaign holds at least the aggregate amount.
 
+The local CLI route generates the campaign artifact locally and uploads it to IPFS through Pinata v3, so it requires a Pinata JWT with `Files: Write` permission.
+
 This skill is a coordinator for airdrop campaign creation and execution routing.
 
 ## Arguments

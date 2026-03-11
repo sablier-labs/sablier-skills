@@ -1,6 +1,6 @@
 # Merkle Tree Generation
 
-This reference covers the full process: collecting recipient data, generating the Merkle tree locally, pinning the campaign JSON to IPFS through Pinata, and extracting the values needed for campaign deployment. The agent handles every step — the only user-provided inputs are the recipient CSV and a single Pinata JWT.
+This reference covers the full process: collecting recipient data, generating the Merkle tree locally, pinning the campaign JSON to IPFS through Pinata v3, and extracting the values needed for campaign deployment. The agent handles every step — the only user-provided inputs are the recipient CSV and a single Pinata JWT.
 
 ## 1) Collect Recipient Data
 
@@ -73,7 +73,7 @@ This requires Node.js. No Rust toolchain or local `merkle-api` process is needed
 
 ### Obtain a Pinata JWT
 
-The local generator uploads the campaign JSON artifact to IPFS through Pinata's v3 Files API on the public network.
+The local generator uploads the campaign JSON artifact to IPFS through Pinata v3's Files API on the public network.
 
 Ask the user to open the Pinata API keys page at [https://app.pinata.cloud/developers/api-keys](https://app.pinata.cloud/developers/api-keys), create an API key, and copy the JWT as:
 

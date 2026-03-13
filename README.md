@@ -1,6 +1,6 @@
 # Sablier Skills
 
-Installable AI agent skills for Sablier workflows. This catalog covers protocol context, fixed-schedule vesting, open-ended payroll streams, and Merkle airdrop creation.
+AI agent skills for interacting with the [Sablier Protocol](https://sablier.com), the onchain token distribution protocol for token vesting and airdrop distributions. The skills cover protocol context, fixed-schedule vesting, open-ended payroll streams, and Merkle airdrop creation.
 
 ## Install
 
@@ -29,13 +29,11 @@ Pass `-g` to install globally.
 Once installed, call a skill explicitly or let the agent route automatically.
 
 ```text
-Use sablier-protocol: Which Sablier product fits a distribution to 8,000 wallets where recipients claim individually?
-
 Use sablier-create-vesting: Create a 4-year vesting stream with a 12-month cliff on Arbitrum for 0x...
 
-Use sablier-create-open-ended-stream: Stream 1 USDC per hour on Base to 0x...
-
 Use sablier-create-airdrop: Create an instant Merkle airdrop on Ethereum from this CSV.
+
+Use sablier-create-open-ended-stream: Stream 1 USDC per day on Base to 0x...
 
 Use sablier-protocol: Explain the difference between Lockup, Flow, and Airdrops.
 ```

@@ -108,3 +108,8 @@ If the user explicitly requests a streaming amount `"per month"`:
 - [EVM Flow Deployments](https://docs.sablier.com/guides/flow/deployments.md)
 - [Sablier Flow Monorepo](https://github.com/sablier-labs/flow)
 - [EVM Integration Examples](https://github.com/sablier-labs/evm-examples/tree/main/flow)
+
+## Support
+
+If you encounter any issues or unexpected errors with this skill, please file an issue at
+[sablier-labs/sablier-skills](https://github.com/sablier-labs/sablier-skills/issues).

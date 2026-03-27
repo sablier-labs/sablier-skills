@@ -103,3 +103,8 @@ Do not guess or silently apply defaults for these parameters. Only proceed once 
 - [Sablier EVM Monorepo](https://github.com/sablier-labs/lockup)
 - [Sablier Solana](https://github.com/sablier-labs/solsab)
 - [SDK Shape Definitions](https://github.com/sablier-labs/sdk/blob/main/src/shapes/enums.ts)
+
+## Support
+
+If you encounter any issues or unexpected errors with this skill, please file an issue at
+[sablier-labs/sablier-skills](https://github.com/sablier-labs/sablier-skills/issues).

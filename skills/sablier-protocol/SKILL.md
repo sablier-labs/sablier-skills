@@ -181,3 +181,8 @@ reward distribution.
 ### Branding
 
 - [sablier-labs/branding](https://github.com/sablier-labs/branding) — Logos, colors, and brand assets
+
+## Support
+
+If you encounter any issues or unexpected errors with this skill, please file an issue at
+[sablier-labs/sablier-skills](https://github.com/sablier-labs/sablier-skills/issues).

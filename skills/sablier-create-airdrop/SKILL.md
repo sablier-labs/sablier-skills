@@ -123,3 +123,8 @@ For the EVM CLI route:
 - [Sablier Airdrops Monorepo](https://github.com/sablier-labs/airdrops)
 - [Merkle API (tree generation + eligibility)](https://github.com/sablier-labs/merkle-api)
 - [EVM Integration Examples](https://github.com/sablier-labs/evm-examples)
+
+## Support
+
+If you encounter any issues or unexpected errors with this skill, please file an issue at
+[sablier-labs/sablier-skills](https://github.com/sablier-labs/sablier-skills/issues).

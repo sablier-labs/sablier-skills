@@ -220,12 +220,10 @@ Look up the `MSG_VALUE` for the chain's native asset from this table:
 | BERA         | 1.9 BERA   | `1900000000000000000`  |
 | BNB          | 0.0016 BNB | `1600000000000000`     |
 | CHZ          | 25 CHZ     | `25000000000000000000` |
-| CORE         | 12.5 CORE  | `12500000000000000000` |
 | HYPE         | 0.032 HYPE | `32000000000000000`    |
 | MON          | 50 MON     | `50000000000000000000` |
 | POL          | 10 POL     | `10000000000000000000` |
 | S            | 25 S       | `25000000000000000000` |
-| SEI          | 14 SEI     | `14000000000000000000` |
 | WATT         | 0 WATT     | `0`                    |
 | xDAI         | 1 xDAI     | `1000000000000000000`  |
 | XDC          | 29 XDC     | `29000000000000000000` |
@@ -324,7 +322,7 @@ Default preview rule: show only human-readable values in the user-facing preview
 - **Recipient, token, rate per second, start time**. In the preview, the rate field must show only the human-readable equivalent, for example `~0.0001 USDC per 30-day month`.
 - **Deposit amount** (for `createAndDeposit`). Show only the human-readable token amount, for example `(0.1 USDC)`.
 - **Creation fee:** ~$1 USD in native token (`MSG_VALUE`)
-- **Expected UI slug after confirmation:** `FL3-${CHAIN_ID}-<streamId>`
+- **Expected UI slug after confirmation:** `FL4-${CHAIN_ID}-<streamId>`
 
 #### 4) Require Explicit Confirmation
 
@@ -400,7 +398,7 @@ After successful receipt verification within the 5-minute timeout:
 - Present the direct link to the stream:
 
 ```
-https://app.sablier.com/payments/stream/FL3-${CHAIN_ID}-${STREAM_ID}
+https://app.sablier.com/payments/stream/FL4-${CHAIN_ID}-${STREAM_ID}
 ```
 
 ### Batch Flow
@@ -430,7 +428,7 @@ Apply the same default preview rule: do not show `CALL_N` blobs, raw `ratePerSec
 - **Function:** `batch(bytes[])`
 - **Number of streams**, each with: recipient, token, human-readable rate only (for example `~0.0001 USDC per 30-day month`), start time, human-readable deposit amount (if any, for example `(0.1 USDC)`)
 - **Creation fee:** ~$1 USD in native token (`MSG_VALUE`) for the entire batch
-- **Expected UI slug after confirmation:** `FL3-${CHAIN_ID}-<streamId>`
+- **Expected UI slug after confirmation:** `FL4-${CHAIN_ID}-<streamId>`
 
 #### 5) Require Explicit Confirmation
 
@@ -491,13 +489,13 @@ After successful receipt verification within the 5-minute timeout:
 
 ```bash
 printf '%s\n' "$STREAM_IDS" | while read -r STREAM_ID; do
-  echo "https://app.sablier.com/payments/stream/FL3-${CHAIN_ID}-${STREAM_ID}"
+  echo "https://app.sablier.com/payments/stream/FL4-${CHAIN_ID}-${STREAM_ID}"
 done
 ```
 
 ## Entrypoint Catalog
 
-Maps each creation function to the correct `SablierFlow` calldata encoding. Refer to ABI definitions in [flow-v2.0-abi.json](../assets/flow-v2.0-abi.json) for exact type encoding.
+Maps each creation function to the correct `SablierFlow` calldata encoding. Refer to ABI definitions in [flow-v3.0-abi.json](../assets/flow-v3.0-abi.json) for exact type encoding.
 
 ### Function-to-Use-Case Mapping
 
@@ -636,7 +634,7 @@ Notes:
 - `true` for `transferable` = the stream NFT can be transferred
 - ERC-20 approval for `AMOUNT` (`3000000000` base units = 3000 USDC) to the `SablierFlow` contract is required before this call
 - `MSG_VALUE` = ~$1 USD worth of native token (see [Creation Fee](#creation-fee-msg_value))
-- After confirmation, wait/poll up to 5 minutes for the confirmed receipt, then extract the real `streamId` from the `CreateFlowStream` log and build the final app link as `https://app.sablier.com/payments/stream/FL3-${CHAIN_ID}-${STREAM_ID}`
+- After confirmation, wait/poll up to 5 minutes for the confirmed receipt, then extract the real `streamId` from the `CreateFlowStream` log and build the final app link as `https://app.sablier.com/payments/stream/FL4-${CHAIN_ID}-${STREAM_ID}`
 
 ### Single Stream: `create` (No Deposit)
 
@@ -667,7 +665,7 @@ Notes:
 - No ERC-20 approval needed — no tokens are transferred at creation time
 - The stream starts accruing debt immediately but remains insolvent until someone deposits
 - `MSG_VALUE` = ~$1 USD worth of native token (see [Creation Fee](#creation-fee-msg_value))
-- After confirmation, wait/poll up to 5 minutes for the confirmed receipt, then extract the real `streamId` from the `CreateFlowStream` log and build the final app link as `https://app.sablier.com/payments/stream/FL3-${CHAIN_ID}-${STREAM_ID}`
+- After confirmation, wait/poll up to 5 minutes for the confirmed receipt, then extract the real `streamId` from the `CreateFlowStream` log and build the final app link as `https://app.sablier.com/payments/stream/FL4-${CHAIN_ID}-${STREAM_ID}`
 
 ### Batch of Streams: 3x `create`
 
@@ -706,7 +704,7 @@ Notes:
 - `MSG_VALUE` = ~$1 USD worth of native token for the entire batch
 - All three streams use the same `SablierFlow` contract and the same `batch()` entrypoint
 - You can mix `create` and `createAndDeposit` calls in the same batch
-- After confirmation, wait/poll up to 5 minutes for the confirmed receipt, then extract all `streamId` values and build one final link per stream as `https://app.sablier.com/payments/stream/FL3-${CHAIN_ID}-${STREAM_ID}`
+- After confirmation, wait/poll up to 5 minutes for the confirmed receipt, then extract all `streamId` values and build one final link per stream as `https://app.sablier.com/payments/stream/FL4-${CHAIN_ID}-${STREAM_ID}`
 - For more than 50 streams, route to `sablier-create-airdrop`
 
 ## Supported Chains
@@ -715,37 +713,34 @@ Use this registry to resolve chain metadata, RPC endpoints, and `SablierFlow` co
 
 UI support note:
 
-- The Flow v2.0 UI alias is `FL3`, so supported payment links use `https://app.sablier.com/payments/stream/FL3-${CHAIN_ID}-${STREAM_ID}`.
+- The Flow v3.0 UI alias is `FL4`, so supported payment links use `https://app.sablier.com/payments/stream/FL4-${CHAIN_ID}-${STREAM_ID}`.
 
 | Chain         | Chain ID   | Native Asset | SablierFlow                                  | RPC URL                                          |
 | ------------- | ---------- | ------------ | -------------------------------------------- | ------------------------------------------------ |
-| Ethereum      | `1`        | ETH          | `0x7a86d3e6894f9c5b5f25ffbdaae658cfc7569623` | `https://ethereum-rpc.publicnode.com`            |
-| Abstract      | `2741`     | ETH          | `0xc415425e56cc6c42b87bacffb276db2292cc1e50` | `https://api.mainnet.abs.xyz`                    |
-| Arbitrum      | `42161`    | ETH          | `0xf0f6477422a346378458f73cf02f05a7492e0c25` | `https://arb1.arbitrum.io/rpc`                   |
-| Avalanche     | `43114`    | AVAX         | `0x64dc318ba879eca8222e963d319728f211c600c7` | `https://api.avax.network/ext/bc/C/rpc`          |
-| Base          | `8453`     | ETH          | `0x8551208f75375abfaee1fbe0a69e390a94000ec2` | `https://mainnet.base.org`                       |
-| Berachain     | `80094`    | BERA         | `0xb89cc68b2ef376ca1b9645f109f7a490b180cf1b` | `https://rpc.berachain.com`                      |
-| Blast         | `81457`    | ETH          | `0x13ce2ca4602d5d1dd323014cd5a4e8414d310a06` | `https://rpc.blast.io`                           |
-| BNB Chain     | `56`       | BNB          | `0x5505c2397B0BeBEEE64919F21Df84F83C008C51b` | `https://bsc-dataseed1.bnbchain.org`             |
-| Chiliz        | `88888`    | CHZ          | `0x21797da50e180d24d6a68e8be6f8daca1c06f0ee` | `https://rpc.chiliz.com`                         |
-| Core Dao      | `1116`     | CORE         | `0x4cb7fb49e4b646b472a5609804004722b3b94f93` | `https://rpc.coredao.org`                        |
-| Denergy       | `369369`   | WATT         | `0xB2Fc49d89B72cD8Aadd7f07D602CF005D5A017Ea` | `https://rpc.d.energy`                           |
-| Gnosis        | `100`      | xDAI         | `0xcdd3eb5283e4a675f16ba83e9d8c28c871a550a2` | `https://rpc.gnosischain.com`                    |
-| HyperEVM      | `999`      | HYPE         | `0x70ce7795896c1e226C71360F9d77B743d8302182` | `https://rpc.hyperliquid.xyz/evm`                |
-| Lightlink     | `1890`     | ETH          | `0x5f742f6becc61e76ae67b0dc29d58f5c964e2c78` | `https://replicator.phoenix.lightlink.io/rpc/v1` |
-| Linea Mainnet | `59144`    | ETH          | `0x977FDf70abeD6b60eECcee85322beA4575B0b6Ed` | `https://rpc.linea.build`                        |
-| Mode          | `34443`    | ETH          | `0xbed2f163cc0aa3278261ef1c3fa51b98db270829` | `https://mainnet.mode.network`                   |
-| Monad         | `143`      | MON          | `0x0340a829b6dC3aDF7710a5bAF1970914af4977f5` | `https://rpc.monad.xyz`                          |
-| Morph         | `2818`     | ETH          | `0xbf407836021c993dfa27cb8232415d15faea709a` | `https://rpc.morphl2.io`                         |
-| OP Mainnet    | `10`       | ETH          | `0xd18491649440d6338532f260761cee64e79d7bb2` | `https://mainnet.optimism.io`                    |
-| Polygon       | `137`      | POL          | `0x62b6d5a3ac0cc91ecebd019d1c70fe955d8c7426` | `https://polygon-bor-rpc.publicnode.com`         |
-| Scroll        | `534352`   | ETH          | `0xc3e92b9714ed01b51fdc29bb88b17af5cddd2c22` | `https://rpc.scroll.io`                          |
-| Sei Network   | `1329`     | SEI          | `0x9eaf5a3f23964148a1321078f9cce4c2325c603e` | `https://evm-rpc.sei-apis.com`                   |
-| Sonic         | `146`      | S            | `0x3954146884425accb86a6476dad69ec3591838cd` | `https://rpc.soniclabs.com`                      |
-| Superseed     | `5330`     | ETH          | `0xe91bbae6c7d67b7c5055de1c9635c17af056211b` | `https://mainnet.superseed.xyz`                  |
-| Unichain      | `130`      | ETH          | `0x170ecc032c96aa976fa702e94fbc9fa5bb64ee7c` | `https://mainnet.unichain.org`                   |
-| XDC           | `50`       | XDC          | `0x3F00b8334EBE2A85875D1F8b50a43a12db67ACAD` | `https://rpc.xinfin.network`                     |
-| ZKsync Era    | `324`      | ETH          | `0xa7f02e692973b6315eaca7fb4285ad2536a89cd0` | `https://mainnet.era.zksync.io`                  |
-| Sepolia       | `11155111` | ETH          | `0xde489096eC9C718358c52a8BBe4ffD74857356e9` | `https://ethereum-sepolia-rpc.publicnode.com`    |
+| Ethereum      | `1`        | ETH          | `0x844344cd871b28221d725ece9630e8bde4e3a181` | `https://ethereum-rpc.publicnode.com`            |
+| Abstract      | `2741`     | ETH          | `0x2fac86e709bac0d970c0e103d3b9580d2df4be5d` | `https://api.mainnet.abs.xyz`                    |
+| Arbitrum      | `42161`    | ETH          | `0xa70b8555157500b11f41a37dd93f4b4e997d583d` | `https://arb1.arbitrum.io/rpc`                   |
+| Avalanche     | `43114`    | AVAX         | `0x980878b890e755c788bce5db7725bcc6df76bf5b` | `https://api.avax.network/ext/bc/C/rpc`          |
+| Base          | `8453`     | ETH          | `0x0cbfe6ce6f05c47d6243bb3818837971c6ccb46b` | `https://mainnet.base.org`                       |
+| Berachain     | `80094`    | BERA         | `0x1794f514d7c1d771055ffd2a880148f619107945` | `https://rpc.berachain.com`                      |
+| BNB Chain     | `56`       | BNB          | `0xa9b86b045caedb791af729f6c15435b978c34f7f` | `https://bsc-dataseed1.bnbchain.org`             |
+| Chiliz        | `88888`    | CHZ          | `0x4d3cecb8eeddd5e69c201017e884ae5e8338474f` | `https://rpc.chiliz.com`                         |
+| Denergy       | `369369`   | WATT         | `0x0B5f82Fa564D2B7F97d6048308167aA8B710e20E` | `https://rpc.d.energy`                           |
+| Gnosis        | `100`      | xDAI         | `0xb3a9a358794b101962a3741ef882b367e9e56c72` | `https://rpc.gnosischain.com`                    |
+| HyperEVM      | `999`      | HYPE         | `0x91B9B0e3be6EeE0556f1cf5bCba2f2673AA28dFE` | `https://rpc.hyperliquid.xyz/evm`                |
+| Lightlink     | `1890`     | ETH          | `0x95f0d947befaecafa8b1e89bbada723d81783d4b` | `https://replicator.phoenix.lightlink.io/rpc/v1` |
+| Linea Mainnet | `59144`    | ETH          | `0x7a92392b7c35610a861f82c42043e6705979369c` | `https://rpc.linea.build`                        |
+| Mode          | `34443`    | ETH          | `0x5a51fd153874429f4cad36cc54560beffeead6df` | `https://mainnet.mode.network`                   |
+| Monad         | `143`      | MON          | `0x95004df5abe86a246664d8f5fb2683f24df768d1` | `https://rpc.monad.xyz`                          |
+| Morph         | `2818`     | ETH          | `0x5ba4cc0a1014faf0967624f3f1c3d63b9ffeb287` | `https://rpc.morphl2.io`                         |
+| OP Mainnet    | `10`       | ETH          | `0xe8a69dabae3003df4cb0901389766c4b2d34c2eb` | `https://mainnet.optimism.io`                    |
+| Polygon       | `137`      | POL          | `0x20080f7e2d58b5cfc4e6d997c841999e3416843c` | `https://polygon-bor-rpc.publicnode.com`         |
+| Scroll        | `534352`   | ETH          | `0xd3dec781af1f5ccb828f97d3e5deb86f6efc5e5a` | `https://rpc.scroll.io`                          |
+| Sonic         | `146`      | S            | `0x1598ed7ffb006a4e233268e7846faa9e17ac9c16` | `https://rpc.soniclabs.com`                      |
+| Superseed     | `5330`     | ETH          | `0xa80de83ea03335396161bb267e1250fb5cc99cdf` | `https://mainnet.superseed.xyz`                  |
+| Unichain      | `130`      | ETH          | `0x12a6a5f809d451d29e4c1a6bca31b88c914100ac` | `https://mainnet.unichain.org`                   |
+| XDC           | `50`       | XDC          | `0x2a89ddeafebf51cb8517da2d00df2365bf3ef49e` | `https://rpc.xinfin.network`                     |
+| ZKsync Era    | `324`      | ETH          | `0xa1b75ac1e36504c93279c69c2583ff0c73eb036b` | `https://mainnet.era.zksync.io`                  |
+| Sepolia       | `11155111` | ETH          | `0xbd9326f6366c95e39bd8ef825c1b2f2ee0dceaa1` | `https://ethereum-sepolia-rpc.publicnode.com`    |
 
 Ethereum can also be referred to as "Mainnet".

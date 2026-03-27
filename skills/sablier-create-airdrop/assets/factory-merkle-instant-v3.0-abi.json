@@ -1,0 +1,139 @@
+[
+  {
+    "type": "function",
+    "name": "computeMerkleInstant",
+    "inputs": [
+      {
+        "name": "campaignCreator",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "campaignParams",
+        "type": "tuple",
+        "internalType": "struct MerkleInstant.ConstructorParams",
+        "components": [
+          {
+            "name": "campaignName",
+            "type": "string",
+            "internalType": "string"
+          },
+          {
+            "name": "campaignStartTime",
+            "type": "uint40",
+            "internalType": "uint40"
+          },
+          {
+            "name": "claimType",
+            "type": "uint8",
+            "internalType": "enum ClaimType"
+          },
+          {
+            "name": "expiration",
+            "type": "uint40",
+            "internalType": "uint40"
+          },
+          {
+            "name": "initialAdmin",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "ipfsCID",
+            "type": "string",
+            "internalType": "string"
+          },
+          {
+            "name": "merkleRoot",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "token",
+            "type": "address",
+            "internalType": "contract IERC20"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "merkleInstant",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "createMerkleInstant",
+    "inputs": [
+      {
+        "name": "campaignParams",
+        "type": "tuple",
+        "internalType": "struct MerkleInstant.ConstructorParams",
+        "components": [
+          {
+            "name": "campaignName",
+            "type": "string",
+            "internalType": "string"
+          },
+          {
+            "name": "campaignStartTime",
+            "type": "uint40",
+            "internalType": "uint40"
+          },
+          {
+            "name": "claimType",
+            "type": "uint8",
+            "internalType": "enum ClaimType"
+          },
+          {
+            "name": "expiration",
+            "type": "uint40",
+            "internalType": "uint40"
+          },
+          {
+            "name": "initialAdmin",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "ipfsCID",
+            "type": "string",
+            "internalType": "string"
+          },
+          {
+            "name": "merkleRoot",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "token",
+            "type": "address",
+            "internalType": "contract IERC20"
+          }
+        ]
+      },
+      {
+        "name": "aggregateAmount",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "recipientCount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "merkleInstant",
+        "type": "address",
+        "internalType": "contract ISablierMerkleInstant"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  }
+]

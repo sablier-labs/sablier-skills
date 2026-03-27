@@ -1,0 +1,239 @@
+[
+  {
+    "type": "function",
+    "name": "computeMerkleLL",
+    "inputs": [
+      {
+        "name": "campaignCreator",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "campaignParams",
+        "type": "tuple",
+        "internalType": "struct MerkleLL.ConstructorParams",
+        "components": [
+          {
+            "name": "campaignName",
+            "type": "string",
+            "internalType": "string"
+          },
+          {
+            "name": "campaignStartTime",
+            "type": "uint40",
+            "internalType": "uint40"
+          },
+          {
+            "name": "cancelable",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "claimType",
+            "type": "uint8",
+            "internalType": "enum ClaimType"
+          },
+          {
+            "name": "cliffDuration",
+            "type": "uint40",
+            "internalType": "uint40"
+          },
+          {
+            "name": "cliffUnlockPercentage",
+            "type": "uint256",
+            "internalType": "UD60x18"
+          },
+          {
+            "name": "expiration",
+            "type": "uint40",
+            "internalType": "uint40"
+          },
+          {
+            "name": "granularity",
+            "type": "uint40",
+            "internalType": "uint40"
+          },
+          {
+            "name": "initialAdmin",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "ipfsCID",
+            "type": "string",
+            "internalType": "string"
+          },
+          {
+            "name": "lockup",
+            "type": "address",
+            "internalType": "contract ISablierLockup"
+          },
+          {
+            "name": "merkleRoot",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "shape",
+            "type": "string",
+            "internalType": "string"
+          },
+          {
+            "name": "startUnlockPercentage",
+            "type": "uint256",
+            "internalType": "UD60x18"
+          },
+          {
+            "name": "token",
+            "type": "address",
+            "internalType": "contract IERC20"
+          },
+          {
+            "name": "totalDuration",
+            "type": "uint40",
+            "internalType": "uint40"
+          },
+          {
+            "name": "transferable",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "vestingStartTime",
+            "type": "uint40",
+            "internalType": "uint40"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "merkleLL",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "createMerkleLL",
+    "inputs": [
+      {
+        "name": "campaignParams",
+        "type": "tuple",
+        "internalType": "struct MerkleLL.ConstructorParams",
+        "components": [
+          {
+            "name": "campaignName",
+            "type": "string",
+            "internalType": "string"
+          },
+          {
+            "name": "campaignStartTime",
+            "type": "uint40",
+            "internalType": "uint40"
+          },
+          {
+            "name": "cancelable",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "claimType",
+            "type": "uint8",
+            "internalType": "enum ClaimType"
+          },
+          {
+            "name": "cliffDuration",
+            "type": "uint40",
+            "internalType": "uint40"
+          },
+          {
+            "name": "cliffUnlockPercentage",
+            "type": "uint256",
+            "internalType": "UD60x18"
+          },
+          {
+            "name": "expiration",
+            "type": "uint40",
+            "internalType": "uint40"
+          },
+          {
+            "name": "granularity",
+            "type": "uint40",
+            "internalType": "uint40"
+          },
+          {
+            "name": "initialAdmin",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "ipfsCID",
+            "type": "string",
+            "internalType": "string"
+          },
+          {
+            "name": "lockup",
+            "type": "address",
+            "internalType": "contract ISablierLockup"
+          },
+          {
+            "name": "merkleRoot",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "shape",
+            "type": "string",
+            "internalType": "string"
+          },
+          {
+            "name": "startUnlockPercentage",
+            "type": "uint256",
+            "internalType": "UD60x18"
+          },
+          {
+            "name": "token",
+            "type": "address",
+            "internalType": "contract IERC20"
+          },
+          {
+            "name": "totalDuration",
+            "type": "uint40",
+            "internalType": "uint40"
+          },
+          {
+            "name": "transferable",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "vestingStartTime",
+            "type": "uint40",
+            "internalType": "uint40"
+          }
+        ]
+      },
+      {
+        "name": "aggregateAmount",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "recipientCount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "merkleLL",
+        "type": "address",
+        "internalType": "contract ISablierMerkleLL"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  }
+]

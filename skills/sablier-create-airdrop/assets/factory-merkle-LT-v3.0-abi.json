@@ -1,0 +1,223 @@
+[
+  {
+    "type": "function",
+    "name": "computeMerkleLT",
+    "inputs": [
+      {
+        "name": "campaignCreator",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "campaignParams",
+        "type": "tuple",
+        "internalType": "struct MerkleLT.ConstructorParams",
+        "components": [
+          {
+            "name": "campaignName",
+            "type": "string",
+            "internalType": "string"
+          },
+          {
+            "name": "campaignStartTime",
+            "type": "uint40",
+            "internalType": "uint40"
+          },
+          {
+            "name": "cancelable",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "claimType",
+            "type": "uint8",
+            "internalType": "enum ClaimType"
+          },
+          {
+            "name": "expiration",
+            "type": "uint40",
+            "internalType": "uint40"
+          },
+          {
+            "name": "initialAdmin",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "ipfsCID",
+            "type": "string",
+            "internalType": "string"
+          },
+          {
+            "name": "lockup",
+            "type": "address",
+            "internalType": "contract ISablierLockup"
+          },
+          {
+            "name": "merkleRoot",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "shape",
+            "type": "string",
+            "internalType": "string"
+          },
+          {
+            "name": "token",
+            "type": "address",
+            "internalType": "contract IERC20"
+          },
+          {
+            "name": "tranchesWithPercentages",
+            "type": "tuple[]",
+            "internalType": "struct MerkleLT.TrancheWithPercentage[]",
+            "components": [
+              {
+                "name": "unlockPercentage",
+                "type": "uint64",
+                "internalType": "UD2x18"
+              },
+              {
+                "name": "duration",
+                "type": "uint40",
+                "internalType": "uint40"
+              }
+            ]
+          },
+          {
+            "name": "transferable",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "vestingStartTime",
+            "type": "uint40",
+            "internalType": "uint40"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "merkleLT",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "createMerkleLT",
+    "inputs": [
+      {
+        "name": "campaignParams",
+        "type": "tuple",
+        "internalType": "struct MerkleLT.ConstructorParams",
+        "components": [
+          {
+            "name": "campaignName",
+            "type": "string",
+            "internalType": "string"
+          },
+          {
+            "name": "campaignStartTime",
+            "type": "uint40",
+            "internalType": "uint40"
+          },
+          {
+            "name": "cancelable",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "claimType",
+            "type": "uint8",
+            "internalType": "enum ClaimType"
+          },
+          {
+            "name": "expiration",
+            "type": "uint40",
+            "internalType": "uint40"
+          },
+          {
+            "name": "initialAdmin",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "ipfsCID",
+            "type": "string",
+            "internalType": "string"
+          },
+          {
+            "name": "lockup",
+            "type": "address",
+            "internalType": "contract ISablierLockup"
+          },
+          {
+            "name": "merkleRoot",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "shape",
+            "type": "string",
+            "internalType": "string"
+          },
+          {
+            "name": "token",
+            "type": "address",
+            "internalType": "contract IERC20"
+          },
+          {
+            "name": "tranchesWithPercentages",
+            "type": "tuple[]",
+            "internalType": "struct MerkleLT.TrancheWithPercentage[]",
+            "components": [
+              {
+                "name": "unlockPercentage",
+                "type": "uint64",
+                "internalType": "UD2x18"
+              },
+              {
+                "name": "duration",
+                "type": "uint40",
+                "internalType": "uint40"
+              }
+            ]
+          },
+          {
+            "name": "transferable",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "vestingStartTime",
+            "type": "uint40",
+            "internalType": "uint40"
+          }
+        ]
+      },
+      {
+        "name": "aggregateAmount",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "recipientCount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "merkleLT",
+        "type": "address",
+        "internalType": "contract ISablierMerkleLT"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  }
+]

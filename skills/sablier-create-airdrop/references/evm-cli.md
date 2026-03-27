@@ -397,9 +397,9 @@ If funding is still pending, add a short warning that recipients cannot claim un
 
 Maps each campaign type to the correct factory function and calldata encoding. Refer to the per-factory ABI definitions for exact tuple encoding:
 
-- [factory-merkle-instant-v2.0-abi.json](../assets/factory-merkle-instant-v2.0-abi.json)
-- [factory-merkle-LL-v2.0-abi.json](../assets/factory-merkle-LL-v2.0-abi.json)
-- [factory-merkle-LT-v2.0-abi.json](../assets/factory-merkle-LT-v2.0-abi.json)
+- [factory-merkle-instant-v3.0-abi.json](../assets/factory-merkle-instant-v3.0-abi.json)
+- [factory-merkle-LL-v3.0-abi.json](../assets/factory-merkle-LL-v3.0-abi.json)
+- [factory-merkle-LT-v3.0-abi.json](../assets/factory-merkle-LT-v3.0-abi.json)
 
 ### `createMerkleInstant`
 
@@ -407,7 +407,7 @@ Deploys a campaign where tokens transfer immediately to recipients on claim.
 
 ```
 createMerkleInstant(
-  (string campaignName, uint40 campaignStartTime, uint40 expiration, address initialAdmin, string ipfsCID, bytes32 merkleRoot, address token),
+  (string campaignName, uint40 campaignStartTime, uint8 claimType, uint40 expiration, address initialAdmin, string ipfsCID, bytes32 merkleRoot, address token),
   uint256 aggregateAmount,
   uint256 recipientCount
 )
@@ -419,13 +419,15 @@ createMerkleInstant(
 2. **aggregateAmount** — total tokens to distribute (informational, not enforced onchain)
 3. **recipientCount** — number of recipients (informational)
 
+- **claimType** — always `0` (ClaimType.DEFAULT) for standard claiming.
+
 ### `createMerkleLL`
 
 Deploys a campaign where each claim creates a Lockup Linear stream with the specified vesting schedule.
 
 ```
 createMerkleLL(
-  (string campaignName, uint40 campaignStartTime, bool cancelable, uint40 cliffDuration, uint256 cliffUnlockPercentage, uint40 expiration, address initialAdmin, string ipfsCID, address lockup, bytes32 merkleRoot, string shape, uint256 startUnlockPercentage, address token, uint40 totalDuration, bool transferable, uint40 vestingStartTime),
+  (string campaignName, uint40 campaignStartTime, bool cancelable, uint8 claimType, uint40 cliffDuration, uint256 cliffUnlockPercentage, uint40 expiration, uint40 granularity, address initialAdmin, string ipfsCID, address lockup, bytes32 merkleRoot, string shape, uint256 startUnlockPercentage, address token, uint40 totalDuration, bool transferable, uint40 vestingStartTime),
   uint256 aggregateAmount,
   uint256 recipientCount
 )
@@ -433,6 +435,8 @@ createMerkleLL(
 
 **Key parameters:**
 
+- **claimType** — always `0` (ClaimType.DEFAULT)
+- **granularity** — use `0` (defaults to 1-second granularity on-chain)
 - **cliffDuration** — seconds; `0` for no cliff
 - **cliffUnlockPercentage** — `uint256`; fraction unlocked after cliff
 - **startUnlockPercentage** — `uint256`; fraction unlocked immediately at stream start
@@ -452,7 +456,7 @@ Deploys a campaign where each claim creates a Lockup Tranched stream with percen
 
 ```
 createMerkleLT(
-  (string campaignName, uint40 campaignStartTime, bool cancelable, uint40 expiration, address initialAdmin, string ipfsCID, address lockup, bytes32 merkleRoot, string shape, address token, (uint64 unlockPercentage, uint40 duration)[] tranchesWithPercentages, bool transferable, uint40 vestingStartTime),
+  (string campaignName, uint40 campaignStartTime, bool cancelable, uint8 claimType, uint40 expiration, address initialAdmin, string ipfsCID, address lockup, bytes32 merkleRoot, string shape, address token, (uint64 unlockPercentage, uint40 duration)[] tranchesWithPercentages, bool transferable, uint40 vestingStartTime),
   uint256 aggregateAmount,
   uint256 recipientCount
 )
@@ -460,6 +464,7 @@ createMerkleLT(
 
 **Key parameters:**
 
+- **claimType** — always `0` (ClaimType.DEFAULT).
 - **tranchesWithPercentages** — array of `(unlockPercentage, duration)` tuples. `unlockPercentage` is a `uint64`. `duration` is seconds.
 - **lockup** — `SablierLockup` contract address
 - **vestingStartTime** — same behavior as MerkleLL
@@ -487,7 +492,7 @@ Each factory exposes a `compute*` function to predict the campaign address befor
 ```
 computeMerkleInstant(
   address campaignCreator,
-  (string campaignName, uint40 campaignStartTime, uint40 expiration, address initialAdmin, string ipfsCID, bytes32 merkleRoot, address token)
+  (string campaignName, uint40 campaignStartTime, uint8 claimType, uint40 expiration, address initialAdmin, string ipfsCID, bytes32 merkleRoot, address token)
 ) → address
 ```
 
@@ -496,7 +501,7 @@ computeMerkleInstant(
 ```
 computeMerkleLL(
   address campaignCreator,
-  (string campaignName, uint40 campaignStartTime, bool cancelable, uint40 cliffDuration, uint256 cliffUnlockPercentage, uint40 expiration, address initialAdmin, string ipfsCID, address lockup, bytes32 merkleRoot, string shape, uint256 startUnlockPercentage, address token, uint40 totalDuration, bool transferable, uint40 vestingStartTime)
+  (string campaignName, uint40 campaignStartTime, bool cancelable, uint8 claimType, uint40 cliffDuration, uint256 cliffUnlockPercentage, uint40 expiration, uint40 granularity, address initialAdmin, string ipfsCID, address lockup, bytes32 merkleRoot, string shape, uint256 startUnlockPercentage, address token, uint40 totalDuration, bool transferable, uint40 vestingStartTime)
 ) → address
 ```
 
@@ -505,7 +510,7 @@ computeMerkleLL(
 ```
 computeMerkleLT(
   address campaignCreator,
-  (string campaignName, uint40 campaignStartTime, bool cancelable, uint40 expiration, address initialAdmin, string ipfsCID, address lockup, bytes32 merkleRoot, string shape, address token, (uint64 unlockPercentage, uint40 duration)[] tranchesWithPercentages, bool transferable, uint40 vestingStartTime)
+  (string campaignName, uint40 campaignStartTime, bool cancelable, uint8 claimType, uint40 expiration, address initialAdmin, string ipfsCID, address lockup, bytes32 merkleRoot, string shape, address token, (uint64 unlockPercentage, uint40 duration)[] tranchesWithPercentages, bool transferable, uint40 vestingStartTime)
 ) → address
 ```
 
@@ -545,17 +550,17 @@ RECIPIENT_COUNT=$(jq -r '.recipients' /tmp/sablier-merkle-result.json)
 # If using a finite expiration instead, compute it once here and reuse it below.
 START_TIME=$(($(date +%s) + 86400))
 EXPIRATION=0
-MERKLE_PARAMS="(\"My Airdrop\",$START_TIME,$EXPIRATION,$OWNER,\"$IPFS_CID\",$MERKLE_ROOT,$TOKEN)"
+MERKLE_PARAMS="(\"My Airdrop\",$START_TIME,0,$EXPIRATION,$OWNER,\"$IPFS_CID\",$MERKLE_ROOT,$TOKEN)"
 
 # Predict campaign address via compute function
-COMPUTE_SIG="computeMerkleInstant(address,(string,uint40,uint40,address,string,bytes32,address))"
+COMPUTE_SIG="computeMerkleInstant(address,(string,uint40,uint8,uint40,address,string,bytes32,address))"
 CAMPAIGN=$(cast call "$FACTORY" "$COMPUTE_SIG" \
   "$OWNER" \
   "$MERKLE_PARAMS" \
   --rpc-url "$RPC_URL")
 
 # 1. Deploy campaign
-FUNCTION_SIG="createMerkleInstant((string,uint40,uint40,address,string,bytes32,address),uint256,uint256)"
+FUNCTION_SIG="createMerkleInstant((string,uint40,uint8,uint40,address,string,bytes32,address),uint256,uint256)"
 TX_HASH=$(cast send "$FACTORY" "$FUNCTION_SIG" \
   "$MERKLE_PARAMS" \
   "$AGGREGATE_AMOUNT" "$RECIPIENT_COUNT" \
@@ -591,10 +596,8 @@ Use this registry to resolve chain metadata and RPC endpoints. Look up factory a
 | Avalanche     | `43114`    | AVAX         | `https://api.avax.network/ext/bc/C/rpc`          |
 | Base          | `8453`     | ETH          | `https://mainnet.base.org`                       |
 | Berachain     | `80094`    | BERA         | `https://rpc.berachain.com`                      |
-| Blast         | `81457`    | ETH          | `https://rpc.blast.io`                           |
 | BNB Chain     | `56`       | BNB          | `https://bsc-dataseed1.bnbchain.org`             |
 | Chiliz        | `88888`    | CHZ          | `https://rpc.chiliz.com`                         |
-| Core Dao      | `1116`     | CORE         | `https://rpc.coredao.org`                        |
 | Denergy       | `369369`   | WATT         | `https://rpc.d.energy`                           |
 | Gnosis        | `100`      | xDAI         | `https://rpc.gnosischain.com`                    |
 | HyperEVM      | `999`      | HYPE         | `https://rpc.hyperliquid.xyz/evm`                |
@@ -606,7 +609,6 @@ Use this registry to resolve chain metadata and RPC endpoints. Look up factory a
 | OP Mainnet    | `10`       | ETH          | `https://mainnet.optimism.io`                    |
 | Polygon       | `137`      | POL          | `https://polygon-bor-rpc.publicnode.com`         |
 | Scroll        | `534352`   | ETH          | `https://rpc.scroll.io`                          |
-| Sei Network   | `1329`     | SEI          | `https://evm-rpc.sei-apis.com`                   |
 | Sonic         | `146`      | S            | `https://rpc.soniclabs.com`                      |
 | Superseed     | `5330`     | ETH          | `https://mainnet.superseed.xyz`                  |
 | Unichain      | `130`      | ETH          | `https://mainnet.unichain.org`                   |

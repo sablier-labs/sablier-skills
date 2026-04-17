@@ -284,14 +284,39 @@ Resolve the withdraw amount:
 - `amount_mode == all` → `AMOUNT="$WITHDRAWABLE"` (base units).
 - Custom amount → `AMOUNT=$(cast to-unit "$HUMAN_AMOUNT" "$DECIMALS")`; reject with a clear error if `AMOUNT > WITHDRAWABLE`.
 
-### Minimum fee (`MSG_VALUE`)
+### Withdraw fee (`MSG_VALUE`)
 
-Lockup v1.0 – v2.x withdraws are free. v3.0+ charge a comptroller-configured minimum fee (~$1 USD in the native asset on v4.0). Probe dynamically — the call reverts on older versions, so default to `0`:
+`withdraw` is `payable` on Lockup **v3.0 and v4.0** and non-payable on every earlier release. Passing a non-zero `--value` against a non-payable contract will revert, so branch on the indexer's `version` field.
+
+On payable versions, charge approximately **~$1 USD** worth of the chain's native asset, matching the fee the `sablier-create-vesting` skill collects on creation:
+
+| Native Asset | ~Amount    | MSG_VALUE (wei)        |
+| ------------ | ---------- | ---------------------- |
+| ETH          | 0.0005 ETH | `500000000000000`      |
+| AVAX         | 0.11 AVAX  | `110000000000000000`   |
+| BERA         | 1.9 BERA   | `1900000000000000000`  |
+| BNB          | 0.0016 BNB | `1600000000000000`     |
+| CHZ          | 25 CHZ     | `25000000000000000000` |
+| HYPE         | 0.032 HYPE | `32000000000000000`    |
+| MON          | 50 MON     | `50000000000000000000` |
+| POL          | 10 POL     | `10000000000000000000` |
+| S            | 25 S       | `25000000000000000000` |
+| WATT         | 0 WATT     | `0`                    |
+| xDAI         | 1 xDAI     | `1000000000000000000`  |
+| XDC          | 29 XDC     | `29000000000000000000` |
+
+> These values are approximate as of March 2026. If a value seems outdated, use web search to find the current price and recalculate as `cast to-wei $(echo "scale=18; 1 / $PRICE" | bc) ether`.
+
+Encode the version branch in bash:
 
 ```bash
-MSG_VALUE=$(cast call "$CONTRACT" "calculateMinFeeWei()(uint256)" \
-  --rpc-url "$RPC_URL" 2>/dev/null || echo 0)
+case "$VERSION" in
+  v1.*|v2.*) MSG_VALUE=0 ;;   # withdraw is not payable on v1.x / v2.x
+  *)         MSG_VALUE="<lookup from table above by chain's native asset>" ;;
+esac
 ```
+
+Before sending, verify the wallet has enough native token for both `MSG_VALUE` and gas.
 
 ### Native gas balance
 
@@ -332,7 +357,7 @@ Token:         USDC (6 decimals)
 Withdrawable:  1,234.567890 USDC
 Withdrawing:   1,234.567890 USDC    ← all
 Destination:   0xRecipient…
-Min fee:       0.0005 ETH (~$1 USD)   ← or 0 for v1.x / v2.x
+Fee:           0.0005 ETH (~$1 USD)   ← 0 on v1.x / v2.x (withdraw not payable)
 ```
 
 Then show the confirmation prompt:
@@ -401,9 +426,12 @@ RECIPIENT=$(echo "$STREAM" | jq -r .recipient)
 DECIMALS=$(echo "$STREAM" | jq -r .asset.decimals)
 TO="$RECIPIENT"
 
-# 3) Live withdrawable + fee
+# 3) Live withdrawable + fee (Ethereum + v4.0 → 0.0005 ETH)
 WITHDRAWABLE=$(cast call "$CONTRACT" "withdrawableAmountOf(uint256)(uint128)" "$TOKEN_ID" --rpc-url "$RPC_URL")
-MSG_VALUE=$(cast call "$CONTRACT" "calculateMinFeeWei()(uint256)" --rpc-url "$RPC_URL" 2>/dev/null || echo 0)
+case "$VERSION" in
+  v1.*|v2.*) MSG_VALUE=0 ;;
+  *)         MSG_VALUE=500000000000000 ;;   # 0.0005 ETH
+esac
 AMOUNT="$WITHDRAWABLE"
 
 # 4) Preview + YES confirmation omitted for brevity

@@ -10,10 +10,10 @@ Use this sequence for every withdraw:
 
 1. Complete [Intake & Planning Inputs](#intake--planning-inputs): wallet, optional chain, optional token symbol, amount.
 2. Run [Chain Discovery](#chain-discovery) if the user did not specify a chain.
-3. Run [Stream Discovery](#stream-discovery) against the Sablier Streams indexer.
+3. Run [Stream Discovery](#stream-discovery) against the Sablier Streams indexer, then pipe the result through [scripts/filter-withdrawable.sh](#drop-streams-with-nothing-to-withdraw) to drop streams with zero currently-withdrawable balance.
 4. Run [Stream Selection](#stream-selection) to narrow to exactly one stream.
 5. Run [Access-Control Check](#access-control-check) to confirm the wallet may sign the withdraw for the selected stream.
-6. Run [Preflight Checks](#preflight-checks): live withdrawable amount, min fee, native gas balance.
+6. Run [Preflight Checks](#preflight-checks): live withdrawable amount (reuse the filter's `.withdrawable` when available), min fee, native gas balance.
 7. Build and show a human-readable transaction preview (no broadcast).
 8. Require explicit user confirmation.
 9. Broadcast with `cast send`.
@@ -193,6 +193,23 @@ RESPONSE=$(curl -sS "$INDEXER" \
 STREAMS=$(echo "$RESPONSE" | jq '.data.LockupStream')
 ```
 
+### Drop streams with nothing to withdraw
+
+The indexer cannot express "withdrawable > 0" directly — that value depends on `block.timestamp` against the stream's schedule (start, cliff, segments, tranches) minus `withdrawnAmount`, and the indexer only stores event-driven state. Presenting the user the whole wallet (e.g. 77 streams) when most have `withdrawableAmountOf == 0` at the current block wastes their attention.
+
+Run every candidate through [scripts/filter-withdrawable.sh](../scripts/filter-withdrawable.sh), which batches `withdrawableAmountOf(uint256)` across all streams into a single `Multicall3.aggregate` call:
+
+```bash
+STREAMS=$(echo "$STREAMS" \
+  | "$SKILL_DIR/scripts/filter-withdrawable.sh" \
+      --rpc-url "$RPC_URL" \
+      --chain-id "$CHAIN_ID")
+```
+
+The script preserves input order, adds a `.withdrawable` field (base-unit string) to each survivor, and drops zero-amount entries. Pass `--include-zero` during debugging if you need to see what was filtered out. `--chain-id` selects the correct Multicall3 deployment — the canonical address works on every Sablier chain except Abstract (2741), XDC (50), and ZKsync Era (324).
+
+If the filtered list is empty, stop and tell the user nothing is currently unlocked across any of their streams on this chain; do not fall back to presenting the zero-withdrawable set.
+
 With a symbol filter add `asset: { symbol: { _eq: $s } }` inside the top-level `where`:
 
 ```
@@ -290,6 +307,14 @@ If the user explicitly asks to send the tokens to a different destination, confi
 ### Live withdrawable amount
 
 The indexer's `intactAmount` is `depositAmount - withdrawnAmount` — the **remaining balance**, not the currently withdrawable amount. Always fetch the live value from the contract; `withdrawableAmountOf` exists on every Lockup version.
+
+If you ran [scripts/filter-withdrawable.sh](../scripts/filter-withdrawable.sh) during [Stream Discovery](#stream-discovery), reuse the `.withdrawable` field it stamped onto the selected stream:
+
+```bash
+WITHDRAWABLE=$(echo "$STREAM" | jq -r .withdrawable)
+```
+
+If you skipped the filter step (e.g. debugging, or the caller already narrowed the input to a single stream), fall back to a direct contract call:
 
 ```bash
 WITHDRAWABLE=$(cast call "$CONTRACT" \
@@ -438,27 +463,33 @@ RESPONSE=$(curl -sS "$INDEXER" \
     --arg s "USDC" \
     '{query:$q,variables:{w:$w,c:$c,s:$s}}')")
 
-# 2) Selection (assume one result for this example)
-STREAM=$(echo "$RESPONSE" | jq '.data.LockupStream[0]')
+# 2) Drop zero-withdrawable streams via Multicall3 (one RPC round trip)
+STREAMS=$(echo "$RESPONSE" | jq '.data.LockupStream' \
+  | "$SKILL_DIR/scripts/filter-withdrawable.sh" \
+      --rpc-url "$RPC_URL" \
+      --chain-id "$CHAIN_ID")
+
+# 3) Selection (assume one result for this example)
+STREAM=$(echo "$STREAMS" | jq '.[0]')
 ALIAS=$(echo "$STREAM" | jq -r .alias)
 CONTRACT=$(echo "$STREAM" | jq -r .contract)
 TOKEN_ID=$(echo "$STREAM" | jq -r .tokenId)
 VERSION=$(echo "$STREAM" | jq -r .version)
 RECIPIENT=$(echo "$STREAM" | jq -r .recipient)
 DECIMALS=$(echo "$STREAM" | jq -r .asset.decimals)
+WITHDRAWABLE=$(echo "$STREAM" | jq -r .withdrawable)
 TO="$RECIPIENT"
 
-# 3) Live withdrawable + fee (Ethereum + v4.0 → 0.0005 ETH)
-WITHDRAWABLE=$(cast call "$CONTRACT" "withdrawableAmountOf(uint256)(uint128)" "$TOKEN_ID" --rpc-url "$RPC_URL" | awk '{print $1}')
+# 4) Fee branch (Ethereum + v4.0 → 0.0005 ETH)
 case "$VERSION" in
   v1.*|v2.*) MSG_VALUE=0 ;;
   *)         MSG_VALUE=500000000000000 ;;   # 0.0005 ETH
 esac
 AMOUNT="$WITHDRAWABLE"
 
-# 4) Preview + YES confirmation omitted for brevity
+# 5) Preview + YES confirmation omitted for brevity
 
-# 5) Broadcast
+# 6) Broadcast
 TX_HASH=$(cast send "$CONTRACT" \
   "withdraw(uint256,address,uint128)" \
   "$TOKEN_ID" "$TO" "$AMOUNT" \
@@ -468,7 +499,7 @@ TX_HASH=$(cast send "$CONTRACT" \
   --browser \
   --async)
 
-# 6) Poll receipt (see "Receipt Wait Timeout" loop) and print
+# 7) Poll receipt (see "Receipt Wait Timeout" loop) and print
 echo "https://app.sablier.com/vesting/stream/${ALIAS}"
 ```
 

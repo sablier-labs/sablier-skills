@@ -67,7 +67,7 @@ Do not guess or silently apply defaults for these parameters. Only proceed once 
 
 ### 5. Route to execution
 
-Hand off to [references/cli.md](references/cli.md) for stream discovery, selection, preview, confirmation, and broadcast.
+Hand off to [references/cli.md](references/cli.md) for stream discovery, selection, preview, confirmation, and broadcast. The discovery step pipes the indexer response through [scripts/filter-withdrawable.sh](scripts/filter-withdrawable.sh), which batches `withdrawableAmountOf` across every candidate into a single Multicall3 call — this collapses `N` RPC round trips into one and avoids presenting the user streams with nothing currently unlocked.
 
 ## Resources
 

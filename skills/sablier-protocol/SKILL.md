@@ -6,7 +6,7 @@ description: This skill should be used when the user asks "what is Sablier", "ex
 # Sablier
 
 Sablier is an onchain token distribution protocol. It powers token vesting, airdrop distributions, and onchain payroll
-across 27+ EVM chains and Solana.
+across 27+ EVM chains.
 
 Organizations use Sablier to distribute tokens at scale—whether compensating contributors, vesting team allocations, or
 airdropping to thousands of recipients. The protocol handles the complexity of time-based token releases, letting teams
@@ -127,16 +127,13 @@ into existing products.
 Sablier smart contracts are deployed across **27+ EVM chains** including Ethereum, Arbitrum, Optimism, Base, Polygon,
 Avalanche, and BSC.
 
-Sablier programs are also deployed on **Solana**.
-
 ### User Interfaces
 
-| Network    | Interface                                        |
-| ---------- | ------------------------------------------------ |
-| EVM chains | [app.sablier.com](https://app.sablier.com)       |
-| Solana     | [solana.sablier.com](https://solana.sablier.com) |
+| Network    | Interface                                  |
+| ---------- | ------------------------------------------ |
+| EVM chains | [app.sablier.com](https://app.sablier.com) |
 
-Both interfaces provide full access to create, manage, and withdraw from distributions without writing code.
+The interface provides full access to create, manage, and withdraw from distributions without writing code.
 
 ## Developer Integration
 
@@ -163,10 +160,6 @@ reward distribution.
 | Lockup   | [sablier-labs/lockup](https://github.com/sablier-labs/lockup)     | Vesting    |
 | Flow     | [sablier-labs/flow](https://github.com/sablier-labs/flow)         | Payments   |
 | Airdrops | [sablier-labs/airdrops](https://github.com/sablier-labs/airdrops) | Airdrops   |
-
-### Solana (Rust)
-
-- [sablier-labs/solsab](https://github.com/sablier-labs/solsab) — Sablier programs for Solana
 
 ### Indexers
 

@@ -3,7 +3,7 @@ name: sablier-create-vesting
 disable-model-invocation: false
 user-invocable: true
 argument-hint: <chain_name> <vested_token_address> <vesting_details>
-description: This skill should be used when the user asks to create "token vesting", "token vesting streams", "onchain vesting", "Ethereum vesting", "EVM vesting", "Solana vesting", "ERC-20 vesting", "ERC20 vesting", "BEP-20 vesting", or "BEP20 vesting" with Sablier Lockup, wants to create vesting schedules for a token or tokens on Ethereum, EVM-compatible chains, BNB Chain, or Solana, needs an agent to run onchain vesting-creation transactions on their behalf.
+description: This skill should be used when the user asks to create "token vesting", "token vesting streams", "onchain vesting", "Ethereum vesting", "EVM vesting", "ERC-20 vesting", "ERC20 vesting", "BEP-20 vesting", or "BEP20 vesting" with Sablier Lockup, wants to create vesting schedules for a token or tokens on Ethereum, EVM-compatible chains, or BNB Chain, needs an agent to run onchain vesting-creation transactions on their behalf.
 ---
 
 # Sablier Vesting Stream Creation
@@ -56,6 +56,7 @@ Treat the following as unsupported by this skill and by Sablier Lockup:
 - Launching tokens for users. Require the user to explicitly provide an existing token address as input.
 - Resolving token symbols (e.g. "USDC") to contract addresses. If the user provides a symbol instead of an address, ask them to provide the exact ERC-20 contract address.
 - Vesting native tokens (ETH, POL, etc.). Only ERC-20 tokens can be vested. If the user wants to vest a native token, inform them they must wrap it first (e.g. WETH) and provide the wrapped token contract address.
+- Rebasing tokens (e.g. Aave aTokens such as aUSDC/aDAI, stETH, AMPL). Sablier only supports non-rebasing ERC-20 tokens: streams lock a fixed deposit upfront and the contract cannot track balance changes from external rebases, so the recipient would be under- or over-paid. If the user requests a rebasing token, stop and tell them this is not allowed; suggest the non-rebasing wrapped variant instead (e.g. static aTokens, wstETH, WAMPL) and ask for that contract address.
 
 ### 3. Clarify vesting details
 
@@ -91,17 +92,16 @@ Do not guess or silently apply defaults for these parameters. Only proceed once 
 2. If the request is any other integration type, inform the user that this skill does not support non-onchain integrations and stop.
 3. Otherwise, follow the route below.
 
-| Intent                                | EVM                                             | Solana                                                                                                       |
-| ------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| Vesting creation on the user's behalf | Use [evm-cli.md](references/evm-cli.md)         | Not yet supported. Direct the user to [solana.sablier.com](https://solana.sablier.com).                      |
-| Onchain integration guidance          | Use [evm-onchain.md](references/evm-onchain.md) | Not yet supported. Direct the user to [docs.sablier.com](https://docs.sablier.com/solana/sablier-on-solana). |
+| Intent                                | EVM                                             |
+| ------------------------------------- | ----------------------------------------------- |
+| Vesting creation on the user's behalf | Use [evm-cli.md](references/evm-cli.md)         |
+| Onchain integration guidance          | Use [evm-onchain.md](references/evm-onchain.md) |
 
 ## Resources
 
 - [Sablier Documentation](https://docs.sablier.com/llms.txt)
 - [EVM Lockup Deployments](https://docs.sablier.com/guides/lockup/deployments.md)
 - [Sablier EVM Monorepo](https://github.com/sablier-labs/lockup)
-- [Sablier Solana](https://github.com/sablier-labs/solsab)
 - [SDK Shape Definitions](https://github.com/sablier-labs/sdk/blob/main/src/shapes/enums.ts)
 
 ## Support

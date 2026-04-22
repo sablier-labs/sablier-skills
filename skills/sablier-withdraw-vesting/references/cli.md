@@ -225,10 +225,25 @@ Present the distinct symbols via `AskUserQuestion` (cap at 4 options, fall back 
 
 - **Exactly one stream matches** — auto-select it and show the user a one-line confirmation: `Selected LK3-1-42 — 1,234.56 USDC withdrawable, sender 0xabc…`.
 - **Multiple streams match (≤4)** — present them as `AskUserQuestion` options. Each option label shows `${alias} — ${withdrawable} ${symbol}` and the description includes the sender and remaining balance.
-- **More than 4 matches** — print a numbered list and ask the user to reply with the alias to pick. Do not call `AskUserQuestion` with >4 options (the tool caps at 4). Show exactly these fields per entry, in this order: `#`, `Alias`, `Withdrawable`, `Remaining`, `Ends`. Do **not** include `Version` or `Category`. Format `Ends` as `Mon DD, YYYY` (e.g. `Oct 12, 2027`) — never `YYYY-MM-DD`. Example generator:
+- **More than 4 matches** — render a Markdown table directly in your chat reply (not in tool stdout) and ask the user to reply with the alias to pick. Do not call `AskUserQuestion` with >4 options (the tool caps at 4).
+
+  **Render the table in the assistant message, not in a Bash `echo`/`printf`.** Most chat UIs collapse tool output by default, so a list printed from `bash` is invisible to the user. Use Bash only to compute values (timestamps, formatted amounts); assemble the table as Markdown in your own response so it renders inline.
+
+  Use a GitHub-flavored Markdown table with exactly these columns, in this order: `#`, `Alias`, `Withdrawable`, `Remaining`, `Ends`, `Sender`. Do **not** include `Version` or `Category`. Right-align numeric columns with `---:` so amounts line up. Format `Ends` as `Mon DD, YYYY` (e.g. `Oct 12, 2027`) — never `YYYY-MM-DD`. Abbreviate the sender address as `0xabcd…wxyz` and append `(you)` when it equals the signer.
+
+  Example generator for `Ends`:
 
   ```bash
   ENDS=$(date -u -r "$END_TIME" "+%b %d, %Y" 2>/dev/null || date -u -d "@$END_TIME" "+%b %d, %Y")
+  ```
+
+  Example table to emit in the chat reply:
+
+  ```markdown
+  |  # | Alias          |   Withdrawable |      Remaining | Ends         | Sender              |
+  | -: | :------------- | -------------: | -------------: | :----------- | :------------------ |
+  |  1 | LK2-8453-2329  |  0.035000 USDC |  0.070000 USDC | Aug 10, 2026 | 0x0298…249f (you)   |
+  |  2 | LK2-8453-2890  |  0.008233 USDC |  0.008233 USDC | Mar 29, 2026 | 0xc517…063c         |
   ```
 
 - **Never auto-withdraw from every stream.** Withdraw one stream per invocation; when the user wants several, tell them to run the flow again for each and do not justify it as a skill rule.

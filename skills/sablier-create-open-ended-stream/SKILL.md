@@ -100,7 +100,7 @@ If the user explicitly requests a streaming amount `"per month"`:
 
 | Intent                                          | EVM                                             |
 | ----------------------------------------------- | ----------------------------------------------- |
-| Open-ended stream creation on the user's behalf | Use [evm-cli.md](references/evm-cli.md)         |
+| Open-ended stream creation on the user's behalf | Use [cli.md](references/cli.md)         |
 | Onchain integration guidance                    | Use [evm-onchain.md](references/evm-onchain.md) |
 
 ## Resources

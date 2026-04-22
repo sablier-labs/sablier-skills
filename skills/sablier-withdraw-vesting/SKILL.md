@@ -52,8 +52,8 @@ Stop and call out unsupported requests before selecting an execution path.
 Use the `AskUserQuestion` tool to fill any missing inputs. Ask only for what is missing — never re-ask for values the user already provided.
 
 - **Wallet address.** A `0x`-prefixed EVM address — case is not enforced; the runbook lowercases it before querying the indexer. This is the address that will sign the withdraw transaction. Ask for this first — both chain and token can be inferred from the indexer once the wallet is known.
-- **Chain name.** Optional. If the user does not know which chain, **do not** send them to an external UI — query the Sablier Streams indexer for every non-depleted stream (as recipient or sender) across all chains, collect the distinct `chainId` values, map them to chain names via the [Supported Chains](references/evm-cli.md#supported-chains) table, and offer them as `AskUserQuestion` options. If exactly one chain has streams, auto-select it and tell the user. See [references/evm-cli.md § Chain discovery](references/evm-cli.md#chain-discovery).
-- **Token symbol.** Optional. If the user does not know which token, query the indexer for every non-depleted stream on the resolved chain where the wallet is recipient or sender, and offer the distinct token symbols as `AskUserQuestion` options (see [references/evm-cli.md § Stream discovery](references/evm-cli.md#stream-discovery)).
+- **Chain name.** Optional. If the user does not know which chain, **do not** send them to an external UI — query the Sablier Streams indexer for every non-depleted stream (as recipient or sender) across all chains, collect the distinct `chainId` values, map them to chain names via the [Supported Chains](references/cli.md#supported-chains) table, and offer them as `AskUserQuestion` options. If exactly one chain has streams, auto-select it and tell the user. See [references/cli.md § Chain discovery](references/cli.md#chain-discovery).
+- **Token symbol.** Optional. If the user does not know which token, query the indexer for every non-depleted stream on the resolved chain where the wallet is recipient or sender, and offer the distinct token symbols as `AskUserQuestion` options (see [references/cli.md § Stream discovery](references/cli.md#stream-discovery)).
 - **Withdraw amount.** Offer two options via `AskUserQuestion`:
   1. **All unlocked** (recommended default) — withdraw every token unlocked so far.
   2. **Custom amount** — the user specifies a smaller amount in human units.
@@ -62,12 +62,12 @@ Do not guess or silently apply defaults for these parameters. Only proceed once 
 
 ### 4. Validate chain support
 
-1. Check whether the resolved chain is listed in the [Supported Chains](references/evm-cli.md#supported-chains) table in the execution runbook.
+1. Check whether the resolved chain is listed in the [Supported Chains](references/cli.md#supported-chains) table in the execution runbook.
 2. If a chain surfaced by the indexer is not in the table, check [Sablier Lockup deployments](https://docs.sablier.com/guides/lockup/deployments) and ask the user for an RPC URL. If still unresolved, stop execution of this skill.
 
 ### 5. Route to execution
 
-Hand off to [references/evm-cli.md](references/evm-cli.md) for stream discovery, selection, preview, confirmation, and broadcast.
+Hand off to [references/cli.md](references/cli.md) for stream discovery, selection, preview, confirmation, and broadcast.
 
 ## Resources
 

@@ -94,7 +94,7 @@ Do not guess or silently apply defaults for these parameters. Only proceed once 
 
 | Intent                                | EVM                                             |
 | ------------------------------------- | ----------------------------------------------- |
-| Vesting creation on the user's behalf | Use [evm-cli.md](references/evm-cli.md)         |
+| Vesting creation on the user's behalf | Use [cli.md](references/cli.md)         |
 | Onchain integration guidance          | Use [evm-onchain.md](references/evm-onchain.md) |
 
 ## Resources

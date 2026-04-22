@@ -105,7 +105,7 @@ Do not guess or silently apply defaults for the campaign type, recipient list, o
 
 | Intent                                         | EVM                                             |
 | ---------------------------------------------- | ----------------------------------------------- |
-| Airdrop campaign creation on the user's behalf | Use [evm-cli.md](references/evm-cli.md)         |
+| Airdrop campaign creation on the user's behalf | Use [cli.md](references/cli.md)         |
 | Onchain integration guidance                   | Use [evm-onchain.md](references/evm-onchain.md) |
 
 ### 7. Handle funding after deployment

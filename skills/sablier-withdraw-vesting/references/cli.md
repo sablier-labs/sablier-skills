@@ -242,11 +242,11 @@ Present the distinct symbols via `AskUserQuestion` (cap at 4 options, fall back 
 
 - **Exactly one stream matches** — auto-select it and show the user a one-line confirmation: `Selected LK3-1-42 — 1,234.56 USDC withdrawable, sender 0xabc…`.
 - **Multiple streams match (≤4)** — present them as `AskUserQuestion` options. Each option label shows `${alias} — ${withdrawable} ${symbol}` and the description includes the sender and remaining balance.
-- **More than 4 matches** — render a Markdown table directly in your chat reply (not in tool stdout) and ask the user to reply with the alias to pick. Do not call `AskUserQuestion` with >4 options (the tool caps at 4).
+- **More than 4 matches** — render a Markdown table directly in your chat reply (not in tool stdout) and ask the user to reply with the stream to pick. Do not call `AskUserQuestion` with >4 options (the tool caps at 4).
 
   **Render the table in the assistant message, not in a Bash `echo`/`printf`.** Most chat UIs collapse tool output by default, so a list printed from `bash` is invisible to the user. Use Bash only to compute values (timestamps, formatted amounts); assemble the table as Markdown in your own response so it renders inline.
 
-  Use a GitHub-flavored Markdown table with exactly these columns, in this order: `#`, `Alias`, `Withdrawable`, `Remaining`, `Ends`, `Sender`. Do **not** include `Version` or `Category`. Right-align numeric columns with `---:` so amounts line up. Format `Ends` as `Mon DD, YYYY` (e.g. `Oct 12, 2027`) — never `YYYY-MM-DD`. Abbreviate the sender address as `0xabcd…wxyz` and append `(you)` when it equals the signer.
+  Use a GitHub-flavored Markdown table with exactly these columns, in this order: `#`, `Stream`, `Withdrawable`, `Remaining`, `Ends`, `Sender`. Do **not** include `Version` or `Category`. Right-align numeric columns with `---:` so amounts line up. Format `Ends` as `Mon DD, YYYY` (e.g. `Oct 12, 2027`) — never `YYYY-MM-DD`. Abbreviate the sender address as `0xabcd…wxyz` and append `(you)` when it equals the signer.
 
   Example generator for `Ends`:
 
@@ -257,7 +257,7 @@ Present the distinct symbols via `AskUserQuestion` (cap at 4 options, fall back 
   Example table to emit in the chat reply:
 
   ```markdown
-  |  # | Alias          |   Withdrawable |      Remaining | Ends         | Sender              |
+  |  # | Stream         |   Withdrawable |      Remaining | Ends         | Sender              |
   | -: | :------------- | -------------: | -------------: | :----------- | :------------------ |
   |  1 | LK2-8453-2329  |  0.035000 USDC |  0.070000 USDC | Aug 10, 2026 | 0x0298…249f (you)   |
   |  2 | LK2-8453-2890  |  0.008233 USDC |  0.008233 USDC | Mar 29, 2026 | 0xc517…063c         |

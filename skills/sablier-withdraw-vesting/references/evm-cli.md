@@ -279,15 +279,17 @@ The indexer's `intactAmount` is `depositAmount - withdrawnAmount` — the **rema
 ```bash
 WITHDRAWABLE=$(cast call "$CONTRACT" \
   "withdrawableAmountOf(uint256)(uint128)" "$TOKEN_ID" \
-  --rpc-url "$RPC_URL")
+  --rpc-url "$RPC_URL" | awk '{print $1}')
 ```
+
+The `awk '{print $1}'` is required: when a `cast call` return type is typed (e.g. `(uint128)`), values ≥ 10000 are printed with a scientific-notation annotation — for example `27336 [2.733e4]`. Taking only the first whitespace-separated field yields the plain integer. Do **not** use `tr -d '[:space:]'` — it collapses the annotation into the number (`27336[2.733e4]`) and breaks every downstream `cast`/`bc` call.
 
 If `$WITHDRAWABLE` is `0`, stop and tell the user nothing is currently unlocked on this stream.
 
 Resolve the withdraw amount:
 
 - `amount_mode == all` → `AMOUNT="$WITHDRAWABLE"` (base units).
-- Custom amount → `AMOUNT=$(cast to-unit "$HUMAN_AMOUNT" "$DECIMALS")`; reject with a clear error if `AMOUNT > WITHDRAWABLE`.
+- Custom amount → `AMOUNT=$(cast parse-units "$HUMAN_AMOUNT" "$DECIMALS")`; reject with a clear error if `AMOUNT > WITHDRAWABLE`.
 
 ### Withdraw fee (`MSG_VALUE`)
 
@@ -348,7 +350,7 @@ If balance is insufficient, stop and tell the user to fund their wallet. Recomme
 
 ## Preview
 
-Present only human-readable values. Do not show raw calldata or base-unit integers by default. Format the amount as `cast from-unit "$AMOUNT" "$DECIMALS"`.
+Present only human-readable values. Do not show raw calldata or base-unit integers by default. Format the amount as `cast format-units "$AMOUNT" "$DECIMALS"`.
 
 Example:
 
@@ -432,7 +434,7 @@ DECIMALS=$(echo "$STREAM" | jq -r .asset.decimals)
 TO="$RECIPIENT"
 
 # 3) Live withdrawable + fee (Ethereum + v4.0 → 0.0005 ETH)
-WITHDRAWABLE=$(cast call "$CONTRACT" "withdrawableAmountOf(uint256)(uint128)" "$TOKEN_ID" --rpc-url "$RPC_URL")
+WITHDRAWABLE=$(cast call "$CONTRACT" "withdrawableAmountOf(uint256)(uint128)" "$TOKEN_ID" --rpc-url "$RPC_URL" | awk '{print $1}')
 case "$VERSION" in
   v1.*|v2.*) MSG_VALUE=0 ;;
   *)         MSG_VALUE=500000000000000 ;;   # 0.0005 ETH

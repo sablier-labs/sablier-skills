@@ -225,8 +225,13 @@ Present the distinct symbols via `AskUserQuestion` (cap at 4 options, fall back 
 
 - **Exactly one stream matches** — auto-select it and show the user a one-line confirmation: `Selected LK3-1-42 — 1,234.56 USDC withdrawable, sender 0xabc…`.
 - **Multiple streams match (≤4)** — present them as `AskUserQuestion` options. Each option label shows `${alias} — ${withdrawable} ${symbol}` and the description includes the sender and remaining balance.
-- **More than 4 matches** — print a numbered table (alias, sender, withdrawable, remaining, start→end) and ask the user to reply with the alias to pick. Do not call `AskUserQuestion` with >4 options (the tool caps at 4).
-- **Never auto-withdraw from every stream.** One stream per invocation.
+- **More than 4 matches** — print a numbered list and ask the user to reply with the alias to pick. Do not call `AskUserQuestion` with >4 options (the tool caps at 4). Show exactly these fields per entry, in this order: `#`, `Alias`, `Withdrawable`, `Remaining`, `Ends`. Do **not** include `Version` or `Category`. Format `Ends` as `Mon DD, YYYY` (e.g. `Oct 12, 2027`) — never `YYYY-MM-DD`. Example generator:
+
+  ```bash
+  ENDS=$(date -u -r "$END_TIME" "+%b %d, %Y" 2>/dev/null || date -u -d "@$END_TIME" "+%b %d, %Y")
+  ```
+
+- **Never auto-withdraw from every stream.** Withdraw one stream per invocation; when the user wants several, tell them to run the flow again for each and do not justify it as a skill rule.
 
 ## Access-Control Check
 

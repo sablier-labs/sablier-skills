@@ -40,7 +40,7 @@ This skill is a coordinator for vesting withdrawal and execution routing.
 
 Stop and call out unsupported requests before selecting an execution path.
 
-- **Batch withdrawal across multiple streams is not supported.** This skill withdraws from exactly one stream per invocation. If the user asks to "withdraw from all my streams" or "claim everything", tell them you will withdraw one stream at a time and offer to repeat the flow afterwards.
+- **Batch withdrawal across multiple streams is not supported.** This skill withdraws from exactly one stream per invocation. If the user asks to "withdraw from all my streams" or "claim everything", tell them to execute the withdrawals one by one. Do not cite "skill rules" or explain the constraint — just direct them to run the flow again for the next stream.
 - **Access-control rules vary by Lockup version** — the runbook enforces them after stream selection:
   - **v1.0 / v1.1** — only the stream's `sender`, `recipient`, or an approved operator can call `withdraw`. If the caller is the `sender`, the tokens must be sent to the `recipient`.
   - **v1.2 onward** — anyone can call `withdraw` as long as the destination (`to`) is the `recipient`. Only the `recipient` or an approved operator can redirect tokens to a third party.

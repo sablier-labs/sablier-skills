@@ -113,7 +113,7 @@ If the user supplied a wallet address earlier, compare it to `$OWNER` after conn
 
 ## Chain Discovery
 
-If the user did not specify a chain, query the indexer across *all* chains for the wallet and collect the distinct `chainId` values that have non-depleted streams.
+If the user did not specify a chain, query the indexer across *all* chains for the wallet and collect the distinct `chainId` values that have non-depleted streams where the wallet is the recipient. Sender-only streams are intentionally ignored — withdrawing on those pushes tokens to the recipient, not to the caller, so they are not useful to surface.
 
 ```bash
 INDEXER="https://indexer.hyperindex.xyz/53b7e25/v1/graphql"
@@ -123,7 +123,7 @@ QUERY='query($w: String!) {
   LockupStream(
     where: {
       depleted: { _eq: false },
-      _or: [ { recipient: { _eq: $w } }, { sender: { _eq: $w } } ]
+      recipient: { _eq: $w }
     }
     limit: 500
   ) {
@@ -158,7 +158,7 @@ No auth header or API key is required. Query syntax is Hasura GraphQL (`_eq`, `_
 
 ### Query: wallet's active streams on the chain
 
-Include both `recipient == wallet` and `sender == wallet` branches so v1.0 / v1.1 streams held as sender are not missed. Filter out depleted streams. If the user provided a token symbol, add it to the `where` clause.
+Restrict to streams where `recipient == wallet` — withdraw always pushes tokens to the recipient, so sender-only streams would just relay funds to a third party and should not be presented. Filter out depleted streams. If the user provided a token symbol, add it to the `where` clause.
 
 ```bash
 INDEXER="https://indexer.hyperindex.xyz/53b7e25/v1/graphql"
@@ -169,10 +169,7 @@ QUERY='query($w: String!, $c: numeric!) {
     where: {
       chainId: { _eq: $c },
       depleted: { _eq: false },
-      _or: [
-        { recipient: { _eq: $w } },
-        { sender: { _eq: $w } }
-      ]
+      recipient: { _eq: $w }
     }
     order_by: { startTime: desc }
     limit: 100
@@ -217,7 +214,7 @@ _and: [
   { chainId: { _eq: $c } },
   { depleted: { _eq: false } },
   { asset: { symbol: { _eq: $s } } },
-  { _or: [ { recipient: { _eq: $w } }, { sender: { _eq: $w } } ] }
+  { recipient: { _eq: $w } }
 ]
 ```
 
@@ -457,7 +454,7 @@ OWNER=$(cast wallet address --browser)
 RESPONSE=$(curl -sS "$INDEXER" \
   -H 'content-type: application/json' \
   --data "$(jq -n \
-    --arg q 'query($w:String!,$c:numeric!,$s:String!){LockupStream(where:{_and:[{chainId:{_eq:$c}},{depleted:{_eq:false}},{asset:{symbol:{_eq:$s}}},{_or:[{recipient:{_eq:$w}},{sender:{_eq:$w}}]}]} order_by:{startTime:desc} limit:100){id alias tokenId contract version sender recipient asset{address symbol decimals} intactAmount}}' \
+    --arg q 'query($w:String!,$c:numeric!,$s:String!){LockupStream(where:{_and:[{chainId:{_eq:$c}},{depleted:{_eq:false}},{asset:{symbol:{_eq:$s}}},{recipient:{_eq:$w}}]} order_by:{startTime:desc} limit:100){id alias tokenId contract version sender recipient asset{address symbol decimals} intactAmount}}' \
     --arg w "$(echo "$WALLET" | tr '[:upper:]' '[:lower:]')" \
     --argjson c "$CHAIN_ID" \
     --arg s "USDC" \

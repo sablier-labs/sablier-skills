@@ -21,7 +21,7 @@ This skill is a coordinator for vesting withdrawal and execution routing.
 | Argument          | Description                                                                                                                                                            |
 | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `chain_name`      | EVM chain where the stream lives (e.g. "Ethereum", "Base", "Polygon").                                                                                                 |
-| `wallet_address`  | The user's wallet. Must be the stream's recipient (v1.2+ also allows a third party if `to == recipient`) or, for v1.0/v1.1 streams, the sender.                        |
+| `wallet_address`  | The user's wallet. Must be the stream's recipient — the skill never surfaces sender-only streams, since withdrawing on those pushes tokens to the recipient, not to the caller.  |
 | `token_symbol`    | Token symbol to narrow the search (e.g. "USDC", "SABL"). If omitted, the skill queries the indexer and lists every token the wallet has an active stream in.           |
 | `withdraw_amount` | Either `all` (withdraw everything unlocked so far) or a human-readable amount (e.g. `250.5`).                                                                          |
 
@@ -52,8 +52,8 @@ Stop and call out unsupported requests before selecting an execution path.
 Use the `AskUserQuestion` tool to fill any missing inputs. Ask only for what is missing — never re-ask for values the user already provided.
 
 - **Wallet address.** A `0x`-prefixed EVM address — case is not enforced; the runbook lowercases it before querying the indexer. This is the address that will sign the withdraw transaction. Ask for this first — both chain and token can be inferred from the indexer once the wallet is known.
-- **Chain name.** Optional. If the user does not know which chain, **do not** send them to an external UI — query the Sablier Streams indexer for every non-depleted stream (as recipient or sender) across all chains, collect the distinct `chainId` values, map them to chain names via the [Supported Chains](references/cli.md#supported-chains) table, and offer them as `AskUserQuestion` options. If exactly one chain has streams, auto-select it and tell the user. See [references/cli.md § Chain discovery](references/cli.md#chain-discovery).
-- **Token symbol.** Optional. If the user does not know which token, query the indexer for every non-depleted stream on the resolved chain where the wallet is recipient or sender, and offer the distinct token symbols as `AskUserQuestion` options (see [references/cli.md § Stream discovery](references/cli.md#stream-discovery)).
+- **Chain name.** Optional. If the user does not know which chain, **do not** send them to an external UI — query the Sablier Streams indexer for every non-depleted stream where the wallet is the recipient across all chains, collect the distinct `chainId` values, map them to chain names via the [Supported Chains](references/cli.md#supported-chains) table, and offer them as `AskUserQuestion` options. If exactly one chain has streams, auto-select it and tell the user. See [references/cli.md § Chain discovery](references/cli.md#chain-discovery).
+- **Token symbol.** Optional. If the user does not know which token, query the indexer for every non-depleted stream on the resolved chain where the wallet is the recipient, and offer the distinct token symbols as `AskUserQuestion` options (see [references/cli.md § Stream discovery](references/cli.md#stream-discovery)).
 - **Withdraw amount.** Offer two options via `AskUserQuestion`:
   1. **All unlocked** (recommended default) — withdraw every token unlocked so far.
   2. **Custom amount** — the user specifies a smaller amount in human units.

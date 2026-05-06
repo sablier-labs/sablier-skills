@@ -8,17 +8,18 @@ This guide is runbook-first: discover the user's streams, narrow to exactly one,
 
 Use this sequence for every withdraw:
 
-1. Complete [Intake & Planning Inputs](#intake--planning-inputs): wallet, optional chain, optional token symbol, amount.
+1. Complete [Intake & Planning Inputs](#intake--planning-inputs): wallet, optional chain, optional token symbol. **Do not ask for the withdraw amount yet** — that question is deferred until step 5, after a single stream is selected.
 2. Run [Chain Discovery](#chain-discovery) if the user did not specify a chain.
 3. Run [Stream Discovery](#stream-discovery) against the Sablier Streams indexer, then pipe the result through [scripts/filter-withdrawable.sh](#drop-streams-with-nothing-to-withdraw) to drop streams with zero currently-withdrawable balance.
 4. Run [Stream Selection](#stream-selection) to narrow to exactly one stream.
-5. Run [Access-Control Check](#access-control-check) to confirm the wallet may sign the withdraw for the selected stream.
-6. Run [Preflight Checks](#preflight-checks): live withdrawable amount (reuse the filter's `.withdrawable` when available), min fee, native gas balance.
-7. Build and show a human-readable transaction preview (no broadcast).
-8. Require explicit user confirmation.
-9. Broadcast with `cast send`.
-10. Wait/poll up to 5 minutes for the confirmed receipt.
-11. Direct the user to the stream page on [app.sablier.com](https://app.sablier.com).
+5. Run [Amount Selection](#amount-selection) — only now ask the user how much to withdraw. They have just seen the unlocked amount on the selected stream, so the question is meaningful.
+6. Run [Access-Control Check](#access-control-check) to confirm the wallet may sign the withdraw for the selected stream.
+7. Run [Preflight Checks](#preflight-checks): live withdrawable amount (reuse the filter's `.withdrawable` when available), min fee, native gas balance.
+8. Build and show a human-readable transaction preview (no broadcast).
+9. Require explicit user confirmation.
+10. Broadcast with `cast send`.
+11. Wait/poll up to 5 minutes for the confirmed receipt.
+12. Direct the user to the stream page on [app.sablier.com](https://app.sablier.com).
 
 ## Mandatory Guardrails
 
@@ -100,8 +101,9 @@ Collect these before hitting the indexer:
 - `wallet` — the address that will sign the withdraw. Required.
 - `chain` (optional) — name and ID resolved from [Supported Chains](#supported-chains). If omitted, [Chain Discovery](#chain-discovery) infers it from the indexer.
 - `symbol` (optional) — narrows the indexer query. If omitted, all the wallet's streams on the chain are listed.
-- `amount_mode` — `all` or a human-readable custom amount.
 - `signing_method` — `--browser` preferred, `--private-key` fallback.
+
+`amount_mode` (`all` or a human-readable custom amount) is **not** an intake input — it is collected later in [Amount Selection](#amount-selection), after the user has selected a single stream and can see how much is unlocked on it. If the user supplied a withdraw amount in the original invocation, carry it forward as the default and skip [Amount Selection](#amount-selection).
 
 Resolve the sender address now so subsequent indexer queries and preview lines agree with what the wallet extension reports:
 
@@ -171,7 +173,7 @@ QUERY='query($w: String!, $c: numeric!) {
       depleted: { _eq: false },
       recipient: { _eq: $w }
     }
-    order_by: { startTime: desc }
+    order_by: { endTime: asc }
     limit: 100
   ) {
     id alias tokenId contract chainId version category
@@ -238,12 +240,12 @@ Present the distinct symbols via `AskUserQuestion` (cap at 4 options, fall back 
 ## Stream Selection
 
 - **Exactly one stream matches** — auto-select it and show the user a one-line confirmation: `Selected LK3-1-42 — 1,234.56 USDC withdrawable, sender 0xabc…`.
-- **Multiple streams match (≤4)** — present them as `AskUserQuestion` options. Each option label shows `${alias} — ${withdrawable} ${symbol}` and the description includes the sender and remaining balance.
+- **Multiple streams match (≤4)** — present them as `AskUserQuestion` options. Each option label shows `${alias} — ${withdrawable} ${symbol}` and the description includes the sender and total vesting balance.
 - **More than 4 matches** — render a Markdown table directly in your chat reply (not in tool stdout) and ask the user to reply with the stream to pick. Do not call `AskUserQuestion` with >4 options (the tool caps at 4).
 
   **Render the table in the assistant message, not in a Bash `echo`/`printf`.** Most chat UIs collapse tool output by default, so a list printed from `bash` is invisible to the user. Use Bash only to compute values (timestamps, formatted amounts); assemble the table as Markdown in your own response so it renders inline.
 
-  Use a GitHub-flavored Markdown table with exactly these columns, in this order: `#`, `Stream`, `Withdrawable`, `Remaining`, `Ends`, `Sender`. Do **not** include `Version` or `Category`. Right-align numeric columns with `---:` so amounts line up. Format `Ends` as `Mon DD, YYYY` (e.g. `Oct 12, 2027`) — never `YYYY-MM-DD`. Abbreviate the sender address as `0xabcd…wxyz` and append `(you)` when it equals the signer.
+  Use a GitHub-flavored Markdown table with exactly these columns, in this order: `#`, `Stream`, `Withdrawable`, `Total Vesting`, `Ends`, `Sender`. The `Total Vesting` column is the indexer's `intactAmount` (`depositAmount - withdrawnAmount`) — i.e. the total tokens still held in the stream for the recipient, both already unlocked and still vesting. Do **not** include `Version` or `Category`. Right-align numeric columns with `---:` so amounts line up. Sort rows by `endTime` ascending (earliest end first) — this matches the indexer query's `order_by`, so preserve the input order. Format `Ends` as `Mon DD, YYYY` (e.g. `Oct 12, 2027`) — never `YYYY-MM-DD`. Abbreviate the sender address as `0xabcd…wxyz` and append `(you)` when it equals the signer.
 
   Example generator for `Ends`:
 
@@ -254,13 +256,24 @@ Present the distinct symbols via `AskUserQuestion` (cap at 4 options, fall back 
   Example table to emit in the chat reply:
 
   ```markdown
-  |  # | Stream         |   Withdrawable |      Remaining | Ends         | Sender              |
+  |  # | Stream         |   Withdrawable |  Total Vesting | Ends         | Sender              |
   | -: | :------------- | -------------: | -------------: | :----------- | :------------------ |
-  |  1 | LK2-8453-2329  |  0.035000 USDC |  0.070000 USDC | Aug 10, 2026 | 0x0298…249f (you)   |
-  |  2 | LK2-8453-2890  |  0.008233 USDC |  0.008233 USDC | Mar 29, 2026 | 0xc517…063c         |
+  |  1 | LK2-8453-2890  |  0.008233 USDC |  0.008233 USDC | Mar 29, 2026 | 0xc517…063c         |
+  |  2 | LK2-8453-2329  |  0.035000 USDC |  0.070000 USDC | Aug 10, 2026 | 0x0298…249f (you)   |
   ```
 
 - **Never auto-withdraw from every stream.** Withdraw one stream per invocation; when the user wants several, tell them to run the flow again for each and do not justify it as a skill rule.
+
+## Amount Selection
+
+By this point the user has seen the selected stream's currently-withdrawable balance (from the filter's `.withdrawable` field, formatted to human units). Only now ask them how much to withdraw, using `AskUserQuestion`:
+
+1. **All unlocked** (recommended default) — withdraw every token unlocked so far on the selected stream.
+2. **Custom amount** — the user specifies a smaller amount in human units (e.g. `250.5`).
+
+Skip this step if the user supplied a `withdraw_amount` in the original invocation. Validate any custom amount against `WITHDRAWABLE` later in [Live withdrawable amount](#live-withdrawable-amount); reject with a clear error if it exceeds the unlocked balance.
+
+Phrasing the question **before** the stream is selected (e.g. "How much would you like to withdraw from the selected USDC stream?") is wrong — the user has not yet seen which streams exist or how much is unlocked on each, so neither "all unlocked" nor a custom amount is meaningful at that point.
 
 ## Access-Control Check
 
@@ -323,10 +336,10 @@ The `awk '{print $1}'` is required: when a `cast call` return type is typed (e.g
 
 If `$WITHDRAWABLE` is `0`, stop and tell the user nothing is currently unlocked on this stream.
 
-Resolve the withdraw amount:
+Resolve the withdraw amount using the choice collected in [Amount Selection](#amount-selection):
 
-- `amount_mode == all` → `AMOUNT="$WITHDRAWABLE"` (base units).
-- Custom amount → `AMOUNT=$(cast parse-units "$HUMAN_AMOUNT" "$DECIMALS")`; reject with a clear error if `AMOUNT > WITHDRAWABLE`.
+- **All unlocked** → `AMOUNT="$WITHDRAWABLE"` (base units).
+- **Custom amount** → `AMOUNT=$(cast parse-units "$HUMAN_AMOUNT" "$DECIMALS")`; reject with a clear error if `AMOUNT > WITHDRAWABLE`.
 
 ### Withdraw fee (`MSG_VALUE`)
 
@@ -454,7 +467,7 @@ OWNER=$(cast wallet address --browser)
 RESPONSE=$(curl -sS "$INDEXER" \
   -H 'content-type: application/json' \
   --data "$(jq -n \
-    --arg q 'query($w:String!,$c:numeric!,$s:String!){LockupStream(where:{_and:[{chainId:{_eq:$c}},{depleted:{_eq:false}},{asset:{symbol:{_eq:$s}}},{recipient:{_eq:$w}}]} order_by:{startTime:desc} limit:100){id alias tokenId contract version sender recipient asset{address symbol decimals} intactAmount}}' \
+    --arg q 'query($w:String!,$c:numeric!,$s:String!){LockupStream(where:{_and:[{chainId:{_eq:$c}},{depleted:{_eq:false}},{asset:{symbol:{_eq:$s}}},{recipient:{_eq:$w}}]} order_by:{endTime:asc} limit:100){id alias tokenId contract version sender recipient asset{address symbol decimals} intactAmount endTime}}' \
     --arg w "$(echo "$WALLET" | tr '[:upper:]' '[:lower:]')" \
     --argjson c "$CHAIN_ID" \
     --arg s "USDC" \

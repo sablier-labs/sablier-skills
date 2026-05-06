@@ -54,9 +54,8 @@ Use the `AskUserQuestion` tool to fill any missing inputs. Ask only for what is 
 - **Wallet address.** A `0x`-prefixed EVM address — case is not enforced; the runbook lowercases it before querying the indexer. This is the address that will sign the withdraw transaction. Ask for this first — both chain and token can be inferred from the indexer once the wallet is known.
 - **Chain name.** Optional. If the user does not know which chain, **do not** send them to an external UI — query the Sablier Streams indexer for every non-depleted stream where the wallet is the recipient across all chains, collect the distinct `chainId` values, map them to chain names via the [Supported Chains](references/cli.md#supported-chains) table, and offer them as `AskUserQuestion` options. If exactly one chain has streams, auto-select it and tell the user. See [references/cli.md § Chain discovery](references/cli.md#chain-discovery).
 - **Token symbol.** Optional. If the user does not know which token, query the indexer for every non-depleted stream on the resolved chain where the wallet is the recipient, and offer the distinct token symbols as `AskUserQuestion` options (see [references/cli.md § Stream discovery](references/cli.md#stream-discovery)).
-- **Withdraw amount.** Offer two options via `AskUserQuestion`:
-  1. **All unlocked** (recommended default) — withdraw every token unlocked so far.
-  2. **Custom amount** — the user specifies a smaller amount in human units.
+
+Do **not** ask for the withdraw amount yet — even if `withdraw_amount` is missing from the invocation, defer that question until after a single stream is selected. Asking up front (e.g. "How much would you like to withdraw from the selected USDC stream?") is wrong, because the user has not yet seen which streams exist or how much is unlocked on each. The runbook asks this question in [references/cli.md § Amount Selection](references/cli.md#amount-selection), once the stream is known.
 
 Do not guess or silently apply defaults for these parameters. Only proceed once all inputs are confirmed.
 

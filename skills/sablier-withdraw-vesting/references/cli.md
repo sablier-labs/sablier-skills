@@ -2,24 +2,28 @@
 
 ## Overview
 
-This guide is runbook-first: discover the user's streams, narrow to exactly one, run preflight checks, preview the transaction, require explicit confirmation, then broadcast and verify.
+This guide is runbook-first: discover the user's streams on the resolved chain, let the user pick any subset (default = all eligible), group the selection by Lockup contract, run preflight checks, preview the batch, require explicit confirmation, then broadcast one `withdrawMultiple` per Lockup contract and verify each receipt.
+
+Each selected stream is withdrawn at its full currently-unlocked balance (`withdrawableAmountOf`). The skill never asks for a custom per-stream amount in batch mode — the goal is to drain everything that's currently claimable on the user's selection.
+
+The skill charges no markup. The only fee paid is the on-chain protocol fee (`calculateMinFeeWei`) on Lockup v3.0+, set by the comptroller. It may be `0`. v1.x and v2.x are non-payable.
 
 ## Execution Sequence
 
-Use this sequence for every withdraw:
+Use this sequence for every batch withdraw:
 
-1. Complete [Intake & Planning Inputs](#intake--planning-inputs): wallet, optional chain, optional token symbol. **Do not ask for the withdraw amount yet** — that question is deferred until step 5, after a single stream is selected.
+1. Complete [Intake & Planning Inputs](#intake--planning-inputs): wallet, optional chain, optional token symbol.
 2. Run [Chain Discovery](#chain-discovery) if the user did not specify a chain.
 3. Run [Stream Discovery](#stream-discovery) against the Sablier Streams indexer, then pipe the result through [scripts/filter-withdrawable.sh](#drop-streams-with-nothing-to-withdraw) to drop streams with zero currently-withdrawable balance.
-4. Run [Stream Selection](#stream-selection) to narrow to exactly one stream.
-5. Run [Amount Selection](#amount-selection) — only now ask the user how much to withdraw. They have just seen the unlocked amount on the selected stream, so the question is meaningful.
-6. Run [Access-Control Check](#access-control-check) to confirm the wallet may sign the withdraw for the selected stream.
-7. Run [Preflight Checks](#preflight-checks): live withdrawable amount (reuse the filter's `.withdrawable` when available), min fee, native gas balance.
-8. Build and show a human-readable transaction preview (no broadcast).
+4. Run [Stream Selection](#stream-selection) to let the user pick any subset of the eligible streams (default: all).
+5. Run [Group by Lockup contract](#group-by-lockup-contract) — split the selection into one batch per distinct contract address. Each batch becomes one transaction.
+6. Run [Access-Control Check](#access-control-check) for each group. Skip groups whose access rules the wallet doesn't satisfy.
+7. Run [Preflight Checks](#preflight-checks): per-group `MSG_VALUE` (the max `calculateMinFeeWei` across the group on v3.0+; `0` otherwise), per-group gas estimate, and an aggregate native-balance check.
+8. Build and show a single human-readable batch preview (no broadcast).
 9. Require explicit user confirmation.
-10. Broadcast with `cast send`.
-11. Wait/poll up to 5 minutes for the confirmed receipt.
-12. Direct the user to the stream page on [app.sablier.com](https://app.sablier.com).
+10. Broadcast each group with `cast send`, sequentially. The user signs once per group.
+11. For each broadcast, wait/poll up to 5 minutes for the confirmed receipt and then scan logs for any `InvalidWithdrawalInWithdrawMultiple` events (v2.0+) so silently-failed streams are surfaced.
+12. Direct the user to each successfully withdrawn stream on [app.sablier.com](https://app.sablier.com).
 
 ## Mandatory Guardrails
 
@@ -50,25 +54,25 @@ fi
 
 For any signing command (`cast send`), use this hierarchy:
 
-1. **`--browser` (preferred)** — delegates signing to the user's browser wallet extension (MetaMask, Rabby, etc.). A local server starts on port 9545 and opens a browser tab where the user approves the transaction. Private keys never touch the terminal or chat. Inform the user: *"A browser tab will open — approve the transaction in your wallet extension (e.g. MetaMask)."*
+1. **`--browser` (preferred)** — delegates signing to the user's browser wallet extension (MetaMask, Rabby, etc.). A local server starts on port 9545 and opens a browser tab where the user approves the transaction. Private keys never touch the terminal or chat. Inform the user: *"A browser tab will open per group — approve each transaction in your wallet extension (e.g. MetaMask)."*
 2. **`--private-key` (fallback)** — only if `--browser` fails at runtime (e.g. no browser available, extension error). Ask the user to provide a private key or set the `ETH_PRIVATE_KEY` environment variable. Never proactively ask the user to paste a private key in the chat.
 
 Do not continue without a signing method.
 
 ### Confirmation Rule (Mandatory)
 
-Always use this sequence for withdraws:
+Always use this sequence for batch withdraws:
 
-1. Build a human-readable preview of the transaction parameters.
-2. Show the transaction details to the user.
-3. Ask for explicit confirmation.
-4. Only after confirmation, run `cast send`.
+1. Build a single human-readable preview that lists every group and every stream in it.
+2. Show the preview to the user.
+3. Ask for explicit confirmation covering the entire batch.
+4. Only after confirmation, run `cast send` per group.
 
-Never broadcast before explicit user confirmation.
+Never broadcast before explicit user confirmation. If the user declines a signature for any group mid-flow, stop and skip the remaining groups; tell them which groups already broadcast and which were aborted.
 
 ### Receipt Wait Timeout (Mandatory)
 
-For every broadcasted withdraw, wait/poll for a confirmed receipt for up to **5 minutes** before treating the transaction as failed or unconfirmed.
+For every broadcasted group, wait/poll for a confirmed receipt for up to **5 minutes** before treating that transaction as failed or unconfirmed. Run the loop independently per group.
 
 ```bash
 RECEIPT=""
@@ -92,18 +96,18 @@ if [ "$TX_STATUS" != "0x1" ]; then
 fi
 ```
 
-If the receipt is still unavailable after 5 minutes, stop, tell the user the transaction may still be pending, and share the hash for manual follow-up. If `status` is not `0x1`, the transaction reverted — stop, show the hash, and ask the user to investigate on a block explorer.
+If the receipt is still unavailable after 5 minutes for a group, stop, tell the user the transaction may still be pending, and share the hash for manual follow-up. If `status` is not `0x1`, the transaction reverted — show the hash and ask the user to investigate on a block explorer. Already-confirmed groups remain confirmed; do not unwind them.
 
 ## Intake & Planning Inputs
 
 Collect these before hitting the indexer:
 
-- `wallet` — the address that will sign the withdraw. Required.
+- `wallet` — the address that will sign the withdraw transactions. Required.
 - `chain` (optional) — name and ID resolved from [Supported Chains](#supported-chains). If omitted, [Chain Discovery](#chain-discovery) infers it from the indexer.
 - `symbol` (optional) — narrows the indexer query. If omitted, all the wallet's streams on the chain are listed.
 - `signing_method` — `--browser` preferred, `--private-key` fallback.
 
-`amount_mode` (`all` or a human-readable custom amount) is **not** an intake input — it is collected later in [Amount Selection](#amount-selection), after the user has selected a single stream and can see how much is unlocked on it. If the user supplied a withdraw amount in the original invocation, carry it forward as the default and skip [Amount Selection](#amount-selection).
+Note: the skill never asks for a custom withdraw amount in batch mode — every selected stream is withdrawn in full at the current `withdrawableAmountOf`. If the user wants a partial amount on a single stream, they should select only that one stream; even then the runbook will withdraw the full unlocked balance for that stream.
 
 Resolve the sender address now so subsequent indexer queries and preview lines agree with what the wallet extension reports:
 
@@ -174,7 +178,7 @@ QUERY='query($w: String!, $c: numeric!) {
       recipient: { _eq: $w }
     }
     order_by: { endTime: asc }
-    limit: 100
+    limit: 500
   ) {
     id alias tokenId contract chainId version category
     sender recipient canceled depleted
@@ -191,6 +195,8 @@ RESPONSE=$(curl -sS "$INDEXER" \
 
 STREAMS=$(echo "$RESPONSE" | jq '.data.LockupStream')
 ```
+
+`limit: 500` is intentional: the batch flow may legitimately surface dozens of streams. If a user has more than 500 active streams on a single chain, raise the limit or paginate.
 
 ### Drop streams with nothing to withdraw
 
@@ -230,7 +236,7 @@ If the user did not provide a symbol, derive the distinct set from the unfiltere
 SYMBOLS=$(echo "$STREAMS" | jq -r '[.[].asset.symbol] | unique | .[]')
 ```
 
-Present the distinct symbols via `AskUserQuestion` (cap at 4 options, fall back to free-text entry beyond that), then re-filter `$STREAMS` locally by the chosen symbol.
+Present the distinct symbols via `AskUserQuestion` (cap at 4 options, fall back to free-text entry beyond that), then re-filter `$STREAMS` locally by the chosen symbol. If the user just wants to "withdraw everything" they can also skip the symbol filter — the batch flow happily mixes tokens, since each stream's `asset` is independent.
 
 ### Edge cases
 
@@ -239,9 +245,11 @@ Present the distinct symbols via `AskUserQuestion` (cap at 4 options, fall back 
 
 ## Stream Selection
 
-- **Exactly one stream matches** — auto-select it and show the user a one-line confirmation: `Selected LK3-1-42 — 1,234.56 USDC withdrawable, sender 0xabc…`.
-- **Multiple streams match (≤4)** — present them as `AskUserQuestion` options. Each option label shows `${alias} — ${withdrawable} ${symbol}` and the description includes the sender and total vesting balance.
-- **More than 4 matches** — render a Markdown table directly in your chat reply (not in tool stdout) and ask the user to reply with the stream to pick. Do not call `AskUserQuestion` with >4 options (the tool caps at 4).
+The default is **withdraw all eligible streams on the chain**. Only ask the user to narrow the set if they explicitly say so or if the list is small enough that confirming each pick is faster than confirming a bulk action.
+
+- **Exactly one stream matches** — auto-select it and show the user a one-line confirmation: `Selected LK3-1-42 — 1,234.56 USDC withdrawable, sender 0xabc…`. Proceed to grouping.
+- **Multiple streams (≤4)** — present them as `AskUserQuestion` with `multiSelect: true`. Each option label shows `${alias} — ${withdrawable} ${symbol}`; the description includes the sender and the stream end date. Add a separate option `All ${N} eligible streams (recommended)` so the user can opt for the bulk action without ticking each box. **Do not** add an "Other" option — `AskUserQuestion` adds it automatically and the user can use it for free-text overrides.
+- **More than 4 streams** — render a Markdown table directly in your chat reply (not in tool stdout) and ask the user to reply with `all` or a comma-separated list of indices (e.g. `1,3,7`). Do not call `AskUserQuestion` with >4 options (the tool caps at 4).
 
   **Render the table in the assistant message, not in a Bash `echo`/`printf`.** Most chat UIs collapse tool output by default, so a list printed from `bash` is invisible to the user. Use Bash only to compute values (timestamps, formatted amounts); assemble the table as Markdown in your own response so it renders inline.
 
@@ -262,133 +270,115 @@ Present the distinct symbols via `AskUserQuestion` (cap at 4 options, fall back 
   |  2 | LK2-8453-2329  |  0.035000 USDC |  0.070000 USDC | Aug 10, 2026 | 0x0298…249f (you)   |
   ```
 
-- **Never auto-withdraw from every stream.** Withdraw one stream per invocation; when the user wants several, tell them to run the flow again for each and do not justify it as a skill rule.
+  After the table, ask: *"Reply with `all` to withdraw every row, or comma-separated row numbers (e.g. `1,3`) to pick a subset."* Validate every index is in `[1, N]` and unique; reject ambiguous input by re-prompting.
 
-## Amount Selection
+The result of this step is `SELECTED` — a JSON array of stream objects, each carrying at minimum `.contract`, `.version`, `.tokenId`, `.withdrawable`, `.alias`, `.recipient`, `.sender`, and `.asset`.
 
-By this point the user has seen the selected stream's currently-withdrawable balance (from the filter's `.withdrawable` field, formatted to human units). Only now ask them how much to withdraw, using `AskUserQuestion`:
+## Group by Lockup contract
 
-1. **All unlocked** (recommended default) — withdraw every token unlocked so far on the selected stream.
-2. **Custom amount** — the user specifies a smaller amount in human units (e.g. `250.5`).
+Each `withdrawMultiple` call hits exactly one Lockup contract, so split the selection by `.contract`:
 
-Skip this step if the user supplied a `withdraw_amount` in the original invocation. Validate any custom amount against `WITHDRAWABLE` later in [Live withdrawable amount](#live-withdrawable-amount); reject with a clear error if it exceeds the unlocked balance.
+```bash
+GROUPS=$(echo "$SELECTED" | jq -c '
+  group_by(.contract)
+  | map({
+      contract: .[0].contract,
+      version: .[0].version,
+      streams: .
+    })
+')
+```
 
-Phrasing the question **before** the stream is selected (e.g. "How much would you like to withdraw from the selected USDC stream?") is wrong — the user has not yet seen which streams exist or how much is unlocked on each, so neither "all unlocked" nor a custom amount is meaningful at that point.
+Invariant: a Lockup contract address always corresponds to a single deployed version, so grouping by `contract` automatically groups by `version`. The runbook treats `version` as authoritative for ABI dispatch and fee logic — never re-derive the version from the alias prefix at this stage.
+
+If `GROUPS` has one element, the entire batch is one transaction. If it has more than one (e.g. the wallet has v1.2 streams on `0x...AAA` and v4.0 streams on `0x...BBB`), the user signs one transaction per group, sequentially.
 
 ## Access-Control Check
 
-Branch on the indexer's `version` field for the selected stream:
+Apply per group, using the group's `version`:
 
-| `version`               | Who can sign `withdraw`?                                                                                                    | Rule for `to`                                                                |
-| ----------------------- | --------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| `v1.0`, `v1.1`          | `sender`, `recipient`, or an approved operator on the Lockup NFT.                                                           | If the caller is the `sender`, `to` **must equal** `recipient`.              |
-| `v1.2`, `v2.0`, `v2.1`, `v3.0`, `v4.0` | Anyone when `to == recipient` (permissionless push-to-recipient). Otherwise only `recipient` or an approved operator. | Default `to = recipient`. Only change it if the caller is `recipient` / approved. |
+| `version`                              | Who can sign `withdrawMultiple`?                                                                                  | Notes for this skill                                                                                                                  |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `v1.0`, `v1.1`                         | The `sender`, `recipient`, or an approved operator. The single shared `to` parameter must equal `recipient` if the caller is `sender`. | The skill always passes `to = OWNER`, and only surfaces streams where `OWNER == recipient`, so this rule is auto-satisfied.            |
+| `v1.2`, `v2.0`, `v2.1`, `v3.0`, `v4.0` | Anyone — there is no `to` parameter; tokens always flow to each stream's own `recipient`.                          | No additional check is required.                                                                                                      |
 
-Encode the rule in bash:
-
-```bash
-WALLET_LC=$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')
-RECIPIENT_LC=$(echo "$RECIPIENT" | tr '[:upper:]' '[:lower:]')
-SENDER_LC=$(echo "$SENDER" | tr '[:upper:]' '[:lower:]')
-TO="$RECIPIENT"  # safe default
-
-case "$VERSION" in
-  v1.0|v1.1)
-    if [ "$WALLET_LC" != "$SENDER_LC" ] && [ "$WALLET_LC" != "$RECIPIENT_LC" ]; then
-      # Approved-operator check would require an on-chain call to `isApprovedForAll` /
-      # `getApproved`. Ask the user to confirm they are an approved operator;
-      # otherwise stop and tell them only sender or recipient can withdraw.
-      :
-    fi
-    ;;
-  *)
-    if [ "$WALLET_LC" != "$RECIPIENT_LC" ]; then
-      # Third-party push allowed only when to == recipient.
-      TO="$RECIPIENT"
-    fi
-    ;;
-esac
-```
-
-If the user explicitly asks to send the tokens to a different destination, confirm that their wallet is the `recipient` (or an approved operator) before accepting a non-default `to`; otherwise stop.
+If for any reason the group contains a stream whose `recipient` is not the connected `OWNER` (this should never happen given the indexer filter, but check defensively), drop that stream from the group and warn the user. If the entire group becomes empty after filtering, drop the group.
 
 ## Preflight Checks
 
-### Live withdrawable amount
+### Withdrawable amounts (per stream)
 
-The indexer's `intactAmount` is `depositAmount - withdrawnAmount` — the **remaining balance**, not the currently withdrawable amount. Always fetch the live value from the contract; `withdrawableAmountOf` exists on every Lockup version.
-
-If you ran [scripts/filter-withdrawable.sh](../scripts/filter-withdrawable.sh) during [Stream Discovery](#stream-discovery), reuse the `.withdrawable` field it stamped onto the selected stream:
+`scripts/filter-withdrawable.sh` already ran during [Stream Discovery](#stream-discovery) and stamped the live `.withdrawable` value (base units) onto each stream. Reuse those values verbatim — every selected stream is withdrawn for its full `.withdrawable` amount:
 
 ```bash
-WITHDRAWABLE=$(echo "$STREAM" | jq -r .withdrawable)
+# Per-stream amounts in the same order as the group's streams.
+AMOUNTS=$(echo "$GROUP" | jq -r '[.streams[].withdrawable] | join(",")')
+IDS=$(echo "$GROUP" | jq -r '[.streams[].tokenId] | join(",")')
 ```
 
-If you skipped the filter step (e.g. debugging, or the caller already narrowed the input to a single stream), fall back to a direct contract call:
+If you skipped the filter step (debugging, or the caller already narrowed the input), recompute via direct contract calls — but the production path always uses the filter result.
 
-```bash
-WITHDRAWABLE=$(cast call "$CONTRACT" \
-  "withdrawableAmountOf(uint256)(uint128)" "$TOKEN_ID" \
-  --rpc-url "$RPC_URL" | awk '{print $1}')
-```
+### Withdraw fee `MSG_VALUE` (per group)
 
-The `awk '{print $1}'` is required: when a `cast call` return type is typed (e.g. `(uint128)`), values ≥ 10000 are printed with a scientific-notation annotation — for example `27336 [2.733e4]`. Taking only the first whitespace-separated field yields the plain integer. Do **not** use `tr -d '[:space:]'` — it collapses the annotation into the number (`27336[2.733e4]`) and breaks every downstream `cast`/`bc` call.
-
-If `$WITHDRAWABLE` is `0`, stop and tell the user nothing is currently unlocked on this stream.
-
-Resolve the withdraw amount using the choice collected in [Amount Selection](#amount-selection):
-
-- **All unlocked** → `AMOUNT="$WITHDRAWABLE"` (base units).
-- **Custom amount** → `AMOUNT=$(cast parse-units "$HUMAN_AMOUNT" "$DECIMALS")`; reject with a clear error if `AMOUNT > WITHDRAWABLE`.
-
-### Withdraw fee (`MSG_VALUE`)
-
-`withdraw` is `payable` on Lockup **v3.0 and v4.0** and non-payable on every earlier release. Passing a non-zero `--value` against a non-payable contract will revert, so branch on the indexer's `version` field.
-
-On payable versions, charge approximately **~$1 USD** worth of the chain's native asset, matching the fee the `sablier-create-vesting` skill collects on creation:
-
-| Native Asset | ~Amount    | MSG_VALUE (wei)        |
-| ------------ | ---------- | ---------------------- |
-| ETH          | 0.0005 ETH | `500000000000000`      |
-| AVAX         | 0.11 AVAX  | `110000000000000000`   |
-| BERA         | 1.9 BERA   | `1900000000000000000`  |
-| BNB          | 0.0016 BNB | `1600000000000000`     |
-| CHZ          | 25 CHZ     | `25000000000000000000` |
-| HYPE         | 0.032 HYPE | `32000000000000000`    |
-| MON          | 50 MON     | `50000000000000000000` |
-| POL          | 10 POL     | `10000000000000000000` |
-| S            | 25 S       | `25000000000000000000` |
-| WATT         | 0 WATT     | `0`                    |
-| xDAI         | 1 xDAI     | `1000000000000000000`  |
-| XDC          | 29 XDC     | `29000000000000000000` |
-
-> These values are approximate as of March 2026. If a value seems outdated, use web search to find the current price and recalculate as `cast to-wei $(echo "scale=18; 1 / $PRICE" | bc) ether`.
-
-Encode the version branch in bash:
+`withdrawMultiple` is `payable` on Lockup **v2.0 onward** and non-payable on v1.x. A non-zero `--value` against a non-payable contract reverts. Branch on the group's `version`:
 
 ```bash
 case "$VERSION" in
-  v1.*|v2.*) MSG_VALUE=0 ;;   # withdraw is not payable on v1.x / v2.x
-  *)         MSG_VALUE="<lookup from table above by chain's native asset>" ;;
+  v1.*|v2.*)
+    # withdrawMultiple is non-payable on v1.x, and on v2.x there is no protocol fee
+    # configured (calculateMinFeeWei does not exist; the contract is payable but the
+    # skill never sends value).
+    MSG_VALUE=0
+    ;;
+  *)
+    # v3.0+ — query calculateMinFeeWei for every stream in the group, then take the MAX.
+    # See the rationale below.
+    MSG_VALUE=$(echo "$GROUP" | jq -r '.streams[].tokenId' | while read -r ID; do
+      cast call "$CONTRACT" "calculateMinFeeWei(uint256)(uint256)" "$ID" \
+        --rpc-url "$RPC_URL" | awk '{print $1}'
+    done | sort -n | tail -1)
+    ;;
 esac
 ```
 
-Before sending, verify the wallet has enough native token for both `MSG_VALUE` and gas.
+The `awk '{print $1}'` strips the scientific-notation annotation that `cast call` prints for typed return values (e.g. `27336 [2.733e4]` → `27336`).
 
-### Native gas balance
+**Why MAX, not SUM.** `withdrawMultiple` does not call `withdraw` externally — it `delegatecall`s into `withdraw` for each stream (see `lockup/src/SablierLockup.sol:437-447`). Solidity preserves `msg.value` across `delegatecall`, and the inner `_withdraw` checks `msg.value >= calculateMinFeeWei(streamId)` (see `lockup/src/SablierLockup.sol:682-687`). So a single `msg.value` covers every iteration; the contract receives the fee exactly once per outer call. Sending the SUM would still pass the contract's check but would needlessly tie up extra ETH in the contract balance — the skill always sends the MAX, so the user pays the minimum required to satisfy every per-stream fee gate. If every stream in the group has a zero fee, `MSG_VALUE` is `0` and the transaction is fee-free.
 
-Estimate gas and compare total cost to the wallet's native balance:
+### Per-group gas estimate
+
+Estimate gas with the exact ABI and arguments the broadcast will use (different per version):
 
 ```bash
-GAS_ESTIMATE=$(cast estimate "$CONTRACT" \
-  "withdraw(uint256,address,uint128)" "$TOKEN_ID" "$TO" "$AMOUNT" \
-  --value "$MSG_VALUE" \
-  --rpc-url "$RPC_URL" \
-  --from "$OWNER")
+case "$VERSION" in
+  v1.0|v1.1)
+    SIG="withdrawMultiple(uint256[],address,uint128[])"
+    GAS_ESTIMATE=$(cast estimate "$CONTRACT" "$SIG" \
+      "[$IDS]" "$OWNER" "[$AMOUNTS]" \
+      --rpc-url "$RPC_URL" --from "$OWNER")
+    ;;
+  *)
+    SIG="withdrawMultiple(uint256[],uint128[])"
+    GAS_ESTIMATE=$(cast estimate "$CONTRACT" "$SIG" \
+      "[$IDS]" "[$AMOUNTS]" \
+      --value "$MSG_VALUE" \
+      --rpc-url "$RPC_URL" --from "$OWNER")
+    ;;
+esac
+```
 
+Note: in v1.0 / v1.1 the function is non-payable, so do not pass `--value`. The `IDS` and `AMOUNTS` strings are comma-separated lists already (e.g. `42,99,1027`); cast renders them as `uint256[]` / `uint128[]` automatically when wrapped in square brackets.
+
+### Aggregate native-balance check
+
+Sum the gas costs and `MSG_VALUE` across all groups; verify the wallet has enough native token to cover the entire batch:
+
+```bash
 GAS_PRICE=$(cast gas-price --rpc-url "$RPC_URL")
 BALANCE=$(cast balance "$OWNER" --rpc-url "$RPC_URL")
-TOTAL_NEEDED=$(echo "$GAS_ESTIMATE * $GAS_PRICE + $MSG_VALUE" | bc)
+
+# Accumulate across groups (pseudo-loop — implement per group during fee/gas calc above).
+TOTAL_NEEDED=$(echo "$TOTAL_GAS_UNITS * $GAS_PRICE + $TOTAL_MSG_VALUE" | bc)
 
 if [ "$(echo "$BALANCE < $TOTAL_NEEDED" | bc)" -eq 1 ]; then
   echo "Insufficient native balance: need $TOTAL_NEEDED wei, have $BALANCE wei"
@@ -396,44 +386,84 @@ if [ "$(echo "$BALANCE < $TOTAL_NEEDED" | bc)" -eq 1 ]; then
 fi
 ```
 
-If balance is insufficient, stop and tell the user to fund their wallet. Recommend [Transak](https://transak.com/buy) as one option.
+If balance is insufficient, stop and tell the user to fund their wallet before trying again. Recommend [Transak](https://transak.com/buy) as one option.
 
 ## Preview
 
-Present only human-readable values. Do not show raw calldata or base-unit integers by default. Format the amount as `cast format-units "$AMOUNT" "$DECIMALS"`.
+Present only human-readable values. Do not show raw calldata or base-unit integers by default. Format amounts with `cast format-units "$AMOUNT" "$DECIMALS"`.
 
-Example:
+The preview is a single message that lists every group and the streams in it, plus per-token totals across the entire batch and the total native-token cost (fee + estimated gas).
+
+Example for a wallet with v1.2 USDC streams and v4.0 SABL streams on the same chain:
 
 ```
-Stream:        LK3-1-42 (Lockup Linear v4.0, Ethereum)
-Contract:      0x93b37Bd5B6b278373217333Ac30D7E74c85fBDCB
-Sender:        0xSender…
-Recipient:     0xRecipient…
+Chain:         Ethereum (1)
 Signer:        0xOwner…  (matches recipient)
-Token:         USDC (6 decimals)
-Withdrawable:  1,234.567890 USDC
-Withdrawing:   1,234.567890 USDC    ← all
-Destination:   0xRecipient…
-Fee:           0.0005 ETH (~$1 USD)   ← 0 on v1.x / v2.x (withdraw not payable)
+Total fee:     0.0005 ETH    ← MAX(calculateMinFeeWei) on the v4.0 group; 0 on v1.x/v2.x
+Estimated gas: 0.0021 ETH    ← sum across all groups
+
+Group 1/2 — Lockup Linear v1.2
+  Contract:    0xAAA…
+  Streams (2):
+    LL2-1-887  →  120.000000 USDC  (sender 0xc517…063c)
+    LL2-1-902  →   45.500000 USDC  (sender 0xc517…063c)
+  Group fee:    0 ETH   (non-payable)
+
+Group 2/2 — Lockup v4.0
+  Contract:    0x93b37Bd5B6b278373217333Ac30D7E74c85fBDCB
+  Streams (3):
+    LK3-1-42   →  1,234.567890 SABL  (sender 0xab12…cd34)
+    LK3-1-58   →    250.000000 SABL  (sender 0xab12…cd34)
+    LK3-1-77   →    100.000000 SABL  (sender 0x99aa…bbcc)
+  Group fee:   0.0005 ETH  ← max calculateMinFeeWei across the 3 streams
+
+Per-token totals:
+  USDC:  165.500000
+  SABL:  1,584.567890
 ```
 
 Then show the confirmation prompt:
 
 ```text
-+------------------------------+
-| Confirm broadcast?           |
-| Reply exactly: YES           |
-+------------------------------+
++--------------------------------------+
+| Confirm broadcast for 2 transactions?|
+| Reply exactly: YES                   |
++--------------------------------------+
 ```
 
-If the user does not explicitly confirm with `YES`, stop.
+If the user does not explicitly confirm with `YES`, stop. If the batch contains a single group, phrase the prompt as `Confirm broadcast for 1 transaction?` (no `s`).
 
 ## Broadcast
 
+Broadcast each group sequentially. The user will see one browser approval prompt per group. Capture the tx hash for each.
+
 ```bash
+# v1.0 / v1.1 — non-payable, single shared `to`
 TX_HASH=$(cast send "$CONTRACT" \
-  "withdraw(uint256,address,uint128)" \
-  "$TOKEN_ID" "$TO" "$AMOUNT" \
+  "withdrawMultiple(uint256[],address,uint128[])" \
+  "[$IDS]" "$OWNER" "[$AMOUNTS]" \
+  --rpc-url "$RPC_URL" \
+  --from "$OWNER" \
+  --browser \
+  --async)
+```
+
+```bash
+# v1.2 / v2.0 / v2.1 — no `to` parameter, no fee
+TX_HASH=$(cast send "$CONTRACT" \
+  "withdrawMultiple(uint256[],uint128[])" \
+  "[$IDS]" "[$AMOUNTS]" \
+  --rpc-url "$RPC_URL" \
+  --from "$OWNER" \
+  --browser \
+  --async)
+```
+
+```bash
+# v3.0 / v4.0 — payable; MSG_VALUE = max(calculateMinFeeWei) across the group
+TX_HASH=$(cast send "$CONTRACT" \
+  "withdrawMultiple(uint256[],uint128[])" \
+  "[$IDS]" "[$AMOUNTS]" \
   --value "$MSG_VALUE" \
   --rpc-url "$RPC_URL" \
   --from "$OWNER" \
@@ -441,11 +471,31 @@ TX_HASH=$(cast send "$CONTRACT" \
   --async)
 ```
 
-Inform the user: *"A browser tab will open — approve the transaction in your wallet extension (e.g. MetaMask)."* If `--browser` fails at runtime, fall back to `--private-key` as described in [Signing Method](#signing-method-mandatory).
+Inform the user before each group: *"A browser tab will open — approve transaction {i}/{N} in your wallet extension (e.g. MetaMask)."* If `--browser` fails at runtime, fall back to `--private-key` as described in [Signing Method](#signing-method-mandatory). If the user declines a signature mid-flow, stop and tell them which group hashes already broadcast and which were not attempted.
 
 ## Verify Receipt
 
-Reuse the polling loop from [Receipt Wait Timeout (Mandatory)](#receipt-wait-timeout-mandatory). After success, direct the user to the stream using the `alias` returned by the indexer — do **not** hardcode `LK3-`, because the alias prefix encodes the Lockup version (`LL3-` for v1.2 linear, `LK-` for v2.0, `LK2-` for v3.0, `LK3-` for v4.0, etc.):
+For each group, run the [Receipt Wait Timeout](#receipt-wait-timeout-mandatory) loop and capture the `RECEIPT` JSON. After confirming `status == 0x1`, scan the logs for any `InvalidWithdrawalInWithdrawMultiple(uint256 streamId, bytes result)` events — these are emitted (instead of reverting) by Lockup **v2.0+** when an individual stream's withdrawal failed inside the batch. Do **not** treat the overall tx as a full success without this check.
+
+```bash
+TOPIC=$(cast keccak "InvalidWithdrawalInWithdrawMultiple(uint256,bytes)")
+
+FAILED_IDS=$(echo "$RECEIPT" | jq -r --arg t "$TOPIC" \
+  '[.logs[] | select(.address == ($contract|ascii_downcase)) | select(.topics[0] == $t) | .topics[1]] | .[]' \
+  --arg contract "$CONTRACT")
+
+if [ -n "$FAILED_IDS" ]; then
+  echo "The transaction confirmed but the following streams in this group did NOT withdraw:"
+  for HEX_ID in $FAILED_IDS; do
+    DEC_ID=$(cast to-dec "$HEX_ID")
+    echo "  streamId $DEC_ID"
+  done
+fi
+```
+
+`v1.x` Lockups don't emit this event — on those versions a per-stream failure reverts the whole `withdrawMultiple`, so a successful receipt already implies every stream withdrew.
+
+After verification, list each successfully withdrawn stream with its app link. Use the `alias` returned by the indexer — do **not** hardcode `LK3-`, because the alias prefix encodes the Lockup version (`LL3-` for v1.2 linear, `LK-` for v2.0, `LK2-` for v3.0, `LK3-` for v4.0, etc.):
 
 ```
 https://app.sablier.com/vesting/stream/${ALIAS}
@@ -453,25 +503,24 @@ https://app.sablier.com/vesting/stream/${ALIAS}
 
 ## Worked Example
 
-A recipient withdrawing all unlocked USDC from a v4.0 stream on Ethereum:
+A recipient with five eligible streams on Base — three on Lockup v1.2 (USDC) and two on v4.0 (SABL) — running a single batch:
 
 ```bash
 INDEXER="https://indexer.hyperindex.xyz/53b7e25/v1/graphql"
-CHAIN_ID=1
-RPC_URL="https://ethereum-rpc.publicnode.com"
+CHAIN_ID=8453
+RPC_URL="https://mainnet.base.org"
 WALLET="0xRecipient…"
 
 OWNER=$(cast wallet address --browser)
 
-# 1) Discovery
+# 1) Stream discovery (no symbol filter — let the user mix tokens)
 RESPONSE=$(curl -sS "$INDEXER" \
   -H 'content-type: application/json' \
   --data "$(jq -n \
-    --arg q 'query($w:String!,$c:numeric!,$s:String!){LockupStream(where:{_and:[{chainId:{_eq:$c}},{depleted:{_eq:false}},{asset:{symbol:{_eq:$s}}},{recipient:{_eq:$w}}]} order_by:{endTime:asc} limit:100){id alias tokenId contract version sender recipient asset{address symbol decimals} intactAmount endTime}}' \
+    --arg q 'query($w:String!,$c:numeric!){LockupStream(where:{chainId:{_eq:$c},depleted:{_eq:false},recipient:{_eq:$w}} order_by:{endTime:asc} limit:500){id alias tokenId contract version sender recipient asset{address symbol decimals} intactAmount endTime}}' \
     --arg w "$(echo "$WALLET" | tr '[:upper:]' '[:lower:]')" \
     --argjson c "$CHAIN_ID" \
-    --arg s "USDC" \
-    '{query:$q,variables:{w:$w,c:$c,s:$s}}')")
+    '{query:$q,variables:{w:$w,c:$c}}')")
 
 # 2) Drop zero-withdrawable streams via Multicall3 (one RPC round trip)
 STREAMS=$(echo "$RESPONSE" | jq '.data.LockupStream' \
@@ -479,38 +528,97 @@ STREAMS=$(echo "$RESPONSE" | jq '.data.LockupStream' \
       --rpc-url "$RPC_URL" \
       --chain-id "$CHAIN_ID")
 
-# 3) Selection (assume one result for this example)
-STREAM=$(echo "$STREAMS" | jq '.[0]')
-ALIAS=$(echo "$STREAM" | jq -r .alias)
-CONTRACT=$(echo "$STREAM" | jq -r .contract)
-TOKEN_ID=$(echo "$STREAM" | jq -r .tokenId)
-VERSION=$(echo "$STREAM" | jq -r .version)
-RECIPIENT=$(echo "$STREAM" | jq -r .recipient)
-DECIMALS=$(echo "$STREAM" | jq -r .asset.decimals)
-WITHDRAWABLE=$(echo "$STREAM" | jq -r .withdrawable)
-TO="$RECIPIENT"
+# 3) Default selection: all eligible streams. SELECTED == STREAMS for the bulk path.
+SELECTED="$STREAMS"
 
-# 4) Fee branch (Ethereum + v4.0 → 0.0005 ETH)
-case "$VERSION" in
-  v1.*|v2.*) MSG_VALUE=0 ;;
-  *)         MSG_VALUE=500000000000000 ;;   # 0.0005 ETH
-esac
-AMOUNT="$WITHDRAWABLE"
+# 4) Group by Lockup contract
+GROUPS=$(echo "$SELECTED" | jq -c '
+  group_by(.contract)
+  | map({contract: .[0].contract, version: .[0].version, streams: .})
+')
 
-# 5) Preview + YES confirmation omitted for brevity
+# 5) Per-group fee + gas estimation
+TOTAL_GAS_UNITS=0
+TOTAL_MSG_VALUE=0
+GAS_PRICE=$(cast gas-price --rpc-url "$RPC_URL")
+declare -a GROUP_PLANS=()
 
-# 6) Broadcast
-TX_HASH=$(cast send "$CONTRACT" \
-  "withdraw(uint256,address,uint128)" \
-  "$TOKEN_ID" "$TO" "$AMOUNT" \
-  --value "$MSG_VALUE" \
-  --rpc-url "$RPC_URL" \
-  --from "$OWNER" \
-  --browser \
-  --async)
+for ROW in $(echo "$GROUPS" | jq -c '.[]'); do
+  CONTRACT=$(echo "$ROW" | jq -r .contract)
+  VERSION=$(echo "$ROW" | jq -r .version)
+  IDS=$(echo "$ROW" | jq -r '[.streams[].tokenId] | join(",")')
+  AMOUNTS=$(echo "$ROW" | jq -r '[.streams[].withdrawable] | join(",")')
 
-# 7) Poll receipt (see "Receipt Wait Timeout" loop) and print
-echo "https://app.sablier.com/vesting/stream/${ALIAS}"
+  case "$VERSION" in
+    v1.*|v2.*)
+      MSG_VALUE=0
+      ;;
+    *)
+      MSG_VALUE=$(echo "$ROW" | jq -r '.streams[].tokenId' | while read -r ID; do
+        cast call "$CONTRACT" "calculateMinFeeWei(uint256)(uint256)" "$ID" \
+          --rpc-url "$RPC_URL" | awk '{print $1}'
+      done | sort -n | tail -1)
+      ;;
+  esac
+
+  case "$VERSION" in
+    v1.0|v1.1)
+      GAS_ESTIMATE=$(cast estimate "$CONTRACT" \
+        "withdrawMultiple(uint256[],address,uint128[])" \
+        "[$IDS]" "$OWNER" "[$AMOUNTS]" \
+        --rpc-url "$RPC_URL" --from "$OWNER")
+      ;;
+    *)
+      GAS_ESTIMATE=$(cast estimate "$CONTRACT" \
+        "withdrawMultiple(uint256[],uint128[])" \
+        "[$IDS]" "[$AMOUNTS]" \
+        --value "$MSG_VALUE" \
+        --rpc-url "$RPC_URL" --from "$OWNER")
+      ;;
+  esac
+
+  TOTAL_GAS_UNITS=$(echo "$TOTAL_GAS_UNITS + $GAS_ESTIMATE" | bc)
+  TOTAL_MSG_VALUE=$(echo "$TOTAL_MSG_VALUE + $MSG_VALUE" | bc)
+  GROUP_PLANS+=("$CONTRACT|$VERSION|$IDS|$AMOUNTS|$MSG_VALUE")
+done
+
+# 6) Aggregate balance check
+BALANCE=$(cast balance "$OWNER" --rpc-url "$RPC_URL")
+TOTAL_NEEDED=$(echo "$TOTAL_GAS_UNITS * $GAS_PRICE + $TOTAL_MSG_VALUE" | bc)
+if [ "$(echo "$BALANCE < $TOTAL_NEEDED" | bc)" -eq 1 ]; then
+  echo "Insufficient native balance: need $TOTAL_NEEDED wei, have $BALANCE wei"
+  exit 1
+fi
+
+# 7) Preview + YES confirmation omitted for brevity
+
+# 8) Broadcast each group
+for PLAN in "${GROUP_PLANS[@]}"; do
+  IFS='|' read -r CONTRACT VERSION IDS AMOUNTS MSG_VALUE <<< "$PLAN"
+
+  case "$VERSION" in
+    v1.0|v1.1)
+      TX_HASH=$(cast send "$CONTRACT" \
+        "withdrawMultiple(uint256[],address,uint128[])" \
+        "[$IDS]" "$OWNER" "[$AMOUNTS]" \
+        --rpc-url "$RPC_URL" --from "$OWNER" --browser --async)
+      ;;
+    *)
+      TX_HASH=$(cast send "$CONTRACT" \
+        "withdrawMultiple(uint256[],uint128[])" \
+        "[$IDS]" "[$AMOUNTS]" \
+        --value "$MSG_VALUE" \
+        --rpc-url "$RPC_URL" --from "$OWNER" --browser --async)
+      ;;
+  esac
+
+  echo "Broadcasted: $TX_HASH"
+  # Poll receipt (see "Receipt Wait Timeout" loop), then scan for
+  # InvalidWithdrawalInWithdrawMultiple events as shown in "Verify Receipt".
+done
+
+# 9) Per-stream app links
+echo "$SELECTED" | jq -r '.[] | "https://app.sablier.com/vesting/stream/" + .alias'
 ```
 
 ## Supported Chains

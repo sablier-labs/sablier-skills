@@ -340,17 +340,19 @@ case "$VERSION" in
     MSG_VALUE=0
     ;;
   *)
-    # v3.0+ — query calculateMinFeeWei for every stream in the group, then take the MAX.
-    # See the rationale below.
-    MSG_VALUE=$(echo "$GROUP" | jq -r '.streams[].tokenId' | while read -r ID; do
-      cast call "$CONTRACT" "calculateMinFeeWei(uint256)(uint256)" "$ID" \
-        --rpc-url "$RPC_URL" | awk '{print $1}'
-    done | sort -n | tail -1)
+    # v3.0+ — batch calculateMinFeeWei for every stream in the group via Multicall3,
+    # take the MAX. See the rationale below.
+    MSG_VALUE=$(echo "$GROUP" | jq '.streams' \
+      | "$SKILL_DIR/scripts/max-min-fee.sh" \
+          --rpc-url "$RPC_URL" --chain-id "$CHAIN_ID")
     ;;
 esac
+
+# Defensive: a non-numeric MSG_VALUE will cascade into bc parser errors below.
+[[ "$MSG_VALUE" =~ ^[0-9]+$ ]] || { echo "Error: MSG_VALUE not numeric: '$MSG_VALUE'"; exit 1; }
 ```
 
-The `awk '{print $1}'` strips the scientific-notation annotation that `cast call` prints for typed return values (e.g. `27336 [2.733e4]` → `27336`).
+[scripts/max-min-fee.sh](../scripts/max-min-fee.sh) collapses the per-stream `cast call` loop into a single Multicall3 round trip — important on public RPCs (Base, Arbitrum, etc.) that throttle bursts. A per-stream loop intermittently produces empty stdout when individual calls are rate-limited, which silently propagates into the bc accumulators below and surfaces as cascading `bc: parser error` lines on the v3.0+ branch.
 
 **Why MAX, not SUM.** `withdrawMultiple` does not call `withdraw` externally — it `delegatecall`s into `withdraw` for each stream (see `lockup/src/SablierLockup.sol:437-447`). Solidity preserves `msg.value` across `delegatecall`, and the inner `_withdraw` checks `msg.value >= calculateMinFeeWei(streamId)` (see `lockup/src/SablierLockup.sol:682-687`). So a single `msg.value` covers every iteration; the contract receives the fee exactly once per outer call. Sending the SUM would still pass the contract's check but would needlessly tie up extra ETH in the contract balance — the skill always sends the MAX, so the user pays the minimum required to satisfy every per-stream fee gate. If every stream in the group has a zero fee, `MSG_VALUE` is `0` and the transaction is fee-free.
 
@@ -385,6 +387,13 @@ Sum the gas costs and `MSG_VALUE` across all groups; verify the wallet has enoug
 ```bash
 GAS_PRICE=$(cast gas-price --rpc-url "$RPC_URL")
 BALANCE=$(cast balance "$OWNER" --rpc-url "$RPC_URL")
+
+# Validate every value before piping through bc — an empty operand silently turns
+# "0 + " into a parser error and the same value cascades through every downstream
+# bc invocation, producing many lines of bc: parser error.
+for v in TOTAL_GAS_UNITS TOTAL_MSG_VALUE GAS_PRICE BALANCE; do
+  [[ "${!v}" =~ ^[0-9]+$ ]] || { echo "Error: $v not numeric: '${!v}'"; exit 1; }
+done
 
 # Accumulate across groups (pseudo-loop — implement per group during fee/gas calc above).
 TOTAL_NEEDED=$(echo "$TOTAL_GAS_UNITS * $GAS_PRICE + $TOTAL_MSG_VALUE" | bc)
@@ -563,12 +572,12 @@ for ROW in $(echo "$GROUPS" | jq -c '.[]'); do
       MSG_VALUE=0
       ;;
     *)
-      MSG_VALUE=$(echo "$ROW" | jq -r '.streams[].tokenId' | while read -r ID; do
-        cast call "$CONTRACT" "calculateMinFeeWei(uint256)(uint256)" "$ID" \
-          --rpc-url "$RPC_URL" | awk '{print $1}'
-      done | sort -n | tail -1)
+      MSG_VALUE=$(echo "$ROW" | jq '.streams' \
+        | "$SKILL_DIR/scripts/max-min-fee.sh" \
+            --rpc-url "$RPC_URL" --chain-id "$CHAIN_ID")
       ;;
   esac
+  [[ "$MSG_VALUE" =~ ^[0-9]+$ ]] || { echo "Error: MSG_VALUE not numeric: '$MSG_VALUE'"; exit 1; }
 
   case "$VERSION" in
     v1.0|v1.1)
@@ -585,8 +594,9 @@ for ROW in $(echo "$GROUPS" | jq -c '.[]'); do
         --rpc-url "$RPC_URL" --from "$OWNER")
       ;;
   esac
+  [[ "$GAS_ESTIMATE" =~ ^[0-9]+$ ]] || { echo "Error: GAS_ESTIMATE not numeric: '$GAS_ESTIMATE'"; exit 1; }
 
-  TOTAL_GAS_UNITS=$(echo "$TOTAL_GAS_UNITS + $GAS_ESTIMATE" | bc)
+  TOTAL_GAS_UNITS=$((TOTAL_GAS_UNITS + GAS_ESTIMATE))
   TOTAL_MSG_VALUE=$(echo "$TOTAL_MSG_VALUE + $MSG_VALUE" | bc)
   GROUP_PLANS+=("$CONTRACT|$VERSION|$IDS|$AMOUNTS|$MSG_VALUE")
 done

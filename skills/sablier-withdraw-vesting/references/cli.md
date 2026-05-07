@@ -255,19 +255,28 @@ The default is **withdraw all eligible streams on the chain**. Only ask the user
 
   Use a GitHub-flavored Markdown table with exactly these columns, in this order: `#`, `Stream`, `Withdrawable`, `Total Vesting`, `Ends`, `Sender`. The `Total Vesting` column is the indexer's `intactAmount` (`depositAmount - withdrawnAmount`) — i.e. the total tokens still held in the stream for the recipient, both already unlocked and still vesting. Do **not** include `Version` or `Category`. Right-align numeric columns with `---:` so amounts line up. Sort rows by `endTime` ascending (earliest end first) — this matches the indexer query's `order_by`, so preserve the input order. Format `Ends` as `Mon DD, YYYY` (e.g. `Oct 12, 2027`) — never `YYYY-MM-DD`. Abbreviate the sender address as `0xabcd…wxyz` and append `(you)` when it equals the signer.
 
-  Example generator for `Ends`:
+  Example generators:
 
   ```bash
   ENDS=$(date -u -r "$END_TIME" "+%b %d, %Y" 2>/dev/null || date -u -d "@$END_TIME" "+%b %d, %Y")
+
+  # Format a base-unit amount and strip trailing fractional zeros so columns
+  # show "0.08" / "0.5" / "100" instead of "0.080000" / "0.500000" / "100.000000".
+  # Significant decimals are preserved: "0.000668" stays "0.000668".
+  fmt_amount() {
+    cast format-units "$1" "$2" | sed -E 's/(\.[0-9]*[1-9])0+$/\1/; s/\.0+$//'
+  }
   ```
+
+  Apply `fmt_amount` to **every** amount shown to the user — table cells, preview lines, per-token totals.
 
   Example table to emit in the chat reply:
 
   ```markdown
-  |  # | Stream         |   Withdrawable |  Total Vesting | Ends         | Sender              |
-  | -: | :------------- | -------------: | -------------: | :----------- | :------------------ |
-  |  1 | LK2-8453-2890  |  0.008233 USDC |  0.008233 USDC | Mar 29, 2026 | 0xc517…063c         |
-  |  2 | LK2-8453-2329  |  0.035000 USDC |  0.070000 USDC | Aug 10, 2026 | 0x0298…249f (you)   |
+  |  # | Stream         | Withdrawable |   Total Vesting | Ends         | Sender              |
+  | -: | :------------- | -----------: | --------------: | :----------- | :------------------ |
+  |  1 | LK2-8453-2890  | 0.008233 USDC | 0.008233 USDC  | Mar 29, 2026 | 0xc517…063c         |
+  |  2 | LK2-8453-2329  |    0.035 USDC |     0.07 USDC  | Aug 10, 2026 | 0x0298…249f (you)   |
   ```
 
   After the table, ask: *"Reply with `all` to withdraw every row, or comma-separated row numbers (e.g. `1,3`) to pick a subset."* Validate every index is in `[1, N]` and unique; reject ambiguous input by re-prompting.
@@ -390,7 +399,7 @@ If balance is insufficient, stop and tell the user to fund their wallet before t
 
 ## Preview
 
-Present only human-readable values. Do not show raw calldata or base-unit integers by default. Format amounts with `cast format-units "$AMOUNT" "$DECIMALS"`.
+Present only human-readable values. Do not show raw calldata or base-unit integers by default. Format amounts with the `fmt_amount` helper from [Stream Selection](#stream-selection) — `cast format-units "$AMOUNT" "$DECIMALS"` followed by trailing-zero stripping — so values display as `0.08` / `0.5` / `100` instead of `0.080000` / `0.500000` / `100.000000`. Significant decimals are preserved (e.g. `0.000668` stays `0.000668`).
 
 The preview is a single message that lists every group and the streams in it, plus per-token totals across the entire batch and the total native-token cost (fee + estimated gas).
 
@@ -405,21 +414,21 @@ Estimated gas: 0.0021 ETH    ← sum across all groups
 Group 1/2 — Lockup Linear v1.2
   Contract:    0xAAA…
   Streams (2):
-    LL2-1-887  →  120.000000 USDC  (sender 0xc517…063c)
-    LL2-1-902  →   45.500000 USDC  (sender 0xc517…063c)
+    LL2-1-887  →  120 USDC      (sender 0xc517…063c)
+    LL2-1-902  →   45.5 USDC    (sender 0xc517…063c)
   Group fee:    0 ETH   (non-payable)
 
 Group 2/2 — Lockup v4.0
   Contract:    0x93b37Bd5B6b278373217333Ac30D7E74c85fBDCB
   Streams (3):
-    LK3-1-42   →  1,234.567890 SABL  (sender 0xab12…cd34)
-    LK3-1-58   →    250.000000 SABL  (sender 0xab12…cd34)
-    LK3-1-77   →    100.000000 SABL  (sender 0x99aa…bbcc)
+    LK3-1-42   →  1,234.56789 SABL  (sender 0xab12…cd34)
+    LK3-1-58   →    250 SABL        (sender 0xab12…cd34)
+    LK3-1-77   →    100 SABL        (sender 0x99aa…bbcc)
   Group fee:   0.0005 ETH  ← max calculateMinFeeWei across the 3 streams
 
 Per-token totals:
-  USDC:  165.500000
-  SABL:  1,584.567890
+  USDC:  165.5
+  SABL:  1,584.56789
 ```
 
 Then show the confirmation prompt:

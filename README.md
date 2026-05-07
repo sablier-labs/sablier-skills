@@ -67,7 +67,7 @@ Each skill directory contains `SKILL.md` and may also ship:
 
 ## Contributing
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for local setup, formatting, and test commands.
+See [AGENTS.md](./AGENTS.md) for local setup, formatting, and test commands.
 
 ## Airdrop Helper
 
@@ -90,6 +90,7 @@ PINATA_JWT=... node generate-merkle-campaign.mjs \
 
 ## Resources
 
+- [Agent Skills](https://agentskills.io)
 - [Sablier Documentation](https://docs.sablier.com)
 - [Sablier App (EVM)](https://app.sablier.com)
 - [Sablier App (Solana)](https://solana.sablier.com)

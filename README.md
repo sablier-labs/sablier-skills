@@ -44,7 +44,7 @@ Use sablier-protocol: Explain the difference between Lockup, Flow, and Airdrops.
 | ---------------------------------- | -------------------------------------------------------------------- | ---------------------------- |
 | `sablier-create-airdrop`           | Create Merkle airdrop campaigns from recipient CSVs                  | Sablier Airdrops, EVM        |
 | `sablier-create-open-ended-stream` | Create open-ended token payment streams with a configurable rate     | Sablier Flow, EVM            |
-| `sablier-create-vesting`           | Create fixed-schedule vesting streams with upfront funding           | Sablier Lockup, EVM + Solana |
+| `sablier-create-vesting`           | Create fixed-schedule vesting streams with upfront funding           | Sablier Lockup, EVM          |
 | `sablier-protocol`                 | Explain the Sablier product surface and common distribution patterns | Advisory / context           |
 
 ## Repo Structure
@@ -93,7 +93,6 @@ PINATA_JWT=... node generate-merkle-campaign.mjs \
 - [Agent Skills](https://agentskills.io)
 - [Sablier Documentation](https://docs.sablier.com)
 - [Sablier App (EVM)](https://app.sablier.com)
-- [Sablier App (Solana)](https://solana.sablier.com)
 
 ## License
 

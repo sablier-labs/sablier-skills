@@ -1,0 +1,28 @@
+{
+  "name": "sablier-withdraw-vesting-solana",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "list-streams": "bun run list-streams.ts",
+    "withdraw": "bun run withdraw.ts"
+  },
+  "dependencies": {
+    "@coral-xyz/anchor": "^0.31.1",
+    "@solana-program/compute-budget": "^0.7.0",
+    "@solana-program/system": "^0.7.0",
+    "@solana-program/token": "^0.5.1",
+    "@solana-program/token-2022": "^0.4.1",
+    "@solana/kit": "^2.1.0",
+    "bs58": "^6.0.0",
+    "dotenv": "^16.4.7",
+    "sablier": "^3.11.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0"
+  }
+}

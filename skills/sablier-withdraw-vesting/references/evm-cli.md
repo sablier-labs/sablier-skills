@@ -12,15 +12,15 @@ The skill charges no markup. The only fee paid is the on-chain protocol fee (`ca
 
 Use this sequence for every batch withdraw:
 
-1. Complete [Intake & Planning Inputs](#intake--planning-inputs): wallet, optional chain, optional token symbol.
-2. Run [Chain Discovery](#chain-discovery) if the user did not specify a chain.
-3. Run [Stream Discovery](#stream-discovery) against the Sablier Streams indexer, then pipe the result through [scripts/filter-withdrawable.sh](#drop-streams-with-nothing-to-withdraw) to drop streams with zero currently-withdrawable balance.
-4. Run [Stream Selection](#stream-selection) to let the user pick any subset of the eligible streams (default: all).
-5. Run [Group by Lockup contract](#group-by-lockup-contract) — split the selection into one batch per distinct contract address. Each batch becomes one transaction.
-6. Run [Access-Control Check](#access-control-check) for each group. Skip groups whose access rules the wallet doesn't satisfy.
-7. Run [Preflight Checks](#preflight-checks): per-group `MSG_VALUE` (the max `calculateMinFeeWei` across the group on v3.0+; `0` otherwise), per-group gas estimate, and an aggregate native-balance check.
-8. Build and show a single human-readable batch preview (no broadcast).
-9. Require explicit user confirmation.
+01. Complete [Intake & Planning Inputs](#intake--planning-inputs): wallet, optional chain, optional token symbol.
+02. Run [Chain Discovery](#chain-discovery) if the user did not specify a chain.
+03. Run [Stream Discovery](#stream-discovery) against the Sablier Streams indexer, then pipe the result through [scripts/evm/filter-withdrawable.sh](#drop-streams-with-nothing-to-withdraw) to drop streams with zero currently-withdrawable balance.
+04. Run [Stream Selection](#stream-selection) to let the user pick any subset of the eligible streams (default: all).
+05. Run [Group by Lockup contract](#group-by-lockup-contract) — split the selection into one batch per distinct contract address. Each batch becomes one transaction.
+06. Run [Access-Control Check](#access-control-check) for each group. Skip groups whose access rules the wallet doesn't satisfy.
+07. Run [Preflight Checks](#preflight-checks): per-group `MSG_VALUE` (the max `calculateMinFeeWei` across the group on v3.0+; `0` otherwise), per-group gas estimate, and an aggregate native-balance check.
+08. Build and show a single human-readable batch preview (no broadcast).
+09. Require explicit user confirmation.
 10. Broadcast each group with `cast send`, sequentially. The user signs once per group.
 11. For each broadcast, wait/poll up to 5 minutes for the confirmed receipt and then scan logs for any `InvalidWithdrawalInWithdrawMultiple` events (v2.0+) so silently-failed streams are surfaced.
 12. Direct the user to each successfully withdrawn stream on [app.sablier.com](https://app.sablier.com).
@@ -202,11 +202,11 @@ STREAMS=$(echo "$RESPONSE" | jq '.data.LockupStream')
 
 The indexer cannot express "withdrawable > 0" directly — that value depends on `block.timestamp` against the stream's schedule (start, cliff, segments, tranches) minus `withdrawnAmount`, and the indexer only stores event-driven state. Presenting the user the whole wallet (e.g. 77 streams) when most have `withdrawableAmountOf == 0` at the current block wastes their attention.
 
-Run every candidate through [scripts/filter-withdrawable.sh](../scripts/filter-withdrawable.sh), which batches `withdrawableAmountOf(uint256)` across all streams into a single `Multicall3.aggregate` call:
+Run every candidate through [scripts/evm/filter-withdrawable.sh](../scripts/evm/filter-withdrawable.sh), which batches `withdrawableAmountOf(uint256)` across all streams into a single `Multicall3.aggregate` call:
 
 ```bash
 STREAMS=$(echo "$STREAMS" \
-  | "$SKILL_DIR/scripts/filter-withdrawable.sh" \
+  | "$SKILL_DIR/scripts/evm/filter-withdrawable.sh" \
       --rpc-url "$RPC_URL" \
       --chain-id "$CHAIN_ID")
 ```
@@ -248,7 +248,9 @@ Present the distinct symbols via `AskUserQuestion` (cap at 4 options, fall back 
 The default is **withdraw all eligible streams on the chain**. Only ask the user to narrow the set if they explicitly say so or if the list is small enough that confirming each pick is faster than confirming a bulk action.
 
 - **Exactly one stream matches** — auto-select it and show the user a one-line confirmation: `Selected LK3-1-42 — 1,234.56 USDC withdrawable, sender 0xabc…`. Proceed to grouping.
+
 - **Multiple streams (≤4)** — present them as `AskUserQuestion` with `multiSelect: true`. Each option label shows `${alias} — ${withdrawable} ${symbol}`; the description includes the sender and the stream end date. Add a separate option `All ${N} eligible streams (recommended)` so the user can opt for the bulk action without ticking each box. **Do not** add an "Other" option — `AskUserQuestion` adds it automatically and the user can use it for free-text overrides.
+
 - **More than 4 streams** — render a Markdown table directly in your chat reply (not in tool stdout) and ask the user to reply with `all` or a comma-separated list of indices (e.g. `1,3,7`). Do not call `AskUserQuestion` with >4 options (the tool caps at 4).
 
   **Render the table in the assistant message, not in a Bash `echo`/`printf`.** Most chat UIs collapse tool output by default, so a list printed from `bash` is invisible to the user. Use Bash only to compute values (timestamps, formatted amounts); assemble the table as Markdown in your own response so it renders inline.
@@ -306,10 +308,10 @@ If `GROUPS` has one element, the entire batch is one transaction. If it has more
 
 Apply per group, using the group's `version`:
 
-| `version`                              | Who can sign `withdrawMultiple`?                                                                                  | Notes for this skill                                                                                                                  |
-| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `v1.0`, `v1.1`                         | The `sender`, `recipient`, or an approved operator. The single shared `to` parameter must equal `recipient` if the caller is `sender`. | The skill always passes `to = OWNER`, and only surfaces streams where `OWNER == recipient`, so this rule is auto-satisfied.            |
-| `v1.2`, `v2.0`, `v2.1`, `v3.0`, `v4.0` | Anyone — there is no `to` parameter; tokens always flow to each stream's own `recipient`.                          | No additional check is required.                                                                                                      |
+| `version`                              | Who can sign `withdrawMultiple`?                                                                                                       | Notes for this skill                                                                                                        |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `v1.0`, `v1.1`                         | The `sender`, `recipient`, or an approved operator. The single shared `to` parameter must equal `recipient` if the caller is `sender`. | The skill always passes `to = OWNER`, and only surfaces streams where `OWNER == recipient`, so this rule is auto-satisfied. |
+| `v1.2`, `v2.0`, `v2.1`, `v3.0`, `v4.0` | Anyone — there is no `to` parameter; tokens always flow to each stream's own `recipient`.                                              | No additional check is required.                                                                                            |
 
 If for any reason the group contains a stream whose `recipient` is not the connected `OWNER` (this should never happen given the indexer filter, but check defensively), drop that stream from the group and warn the user. If the entire group becomes empty after filtering, drop the group.
 
@@ -317,7 +319,7 @@ If for any reason the group contains a stream whose `recipient` is not the conne
 
 ### Withdrawable amounts (per stream)
 
-`scripts/filter-withdrawable.sh` already ran during [Stream Discovery](#stream-discovery) and stamped the live `.withdrawable` value (base units) onto each stream. Reuse those values verbatim — every selected stream is withdrawn for its full `.withdrawable` amount:
+`scripts/evm/filter-withdrawable.sh` already ran during [Stream Discovery](#stream-discovery) and stamped the live `.withdrawable` value (base units) onto each stream. Reuse those values verbatim — every selected stream is withdrawn for its full `.withdrawable` amount:
 
 ```bash
 # Per-stream amounts in the same order as the group's streams.
@@ -343,7 +345,7 @@ case "$VERSION" in
     # v3.0+ — batch calculateMinFeeWei for every stream in the group via Multicall3,
     # take the MAX. See the rationale below.
     MSG_VALUE=$(echo "$GROUP" | jq '.streams' \
-      | "$SKILL_DIR/scripts/max-min-fee.sh" \
+      | "$SKILL_DIR/scripts/evm/max-min-fee.sh" \
           --rpc-url "$RPC_URL" --chain-id "$CHAIN_ID")
     ;;
 esac
@@ -352,7 +354,7 @@ esac
 [[ "$MSG_VALUE" =~ ^[0-9]+$ ]] || { echo "Error: MSG_VALUE not numeric: '$MSG_VALUE'"; exit 1; }
 ```
 
-[scripts/max-min-fee.sh](../scripts/max-min-fee.sh) collapses the per-stream `cast call` loop into a single Multicall3 round trip — important on public RPCs (Base, Arbitrum, etc.) that throttle bursts. A per-stream loop intermittently produces empty stdout when individual calls are rate-limited, which silently propagates into the bc accumulators below and surfaces as cascading `bc: parser error` lines on the v3.0+ branch.
+[scripts/evm/max-min-fee.sh](../scripts/evm/max-min-fee.sh) collapses the per-stream `cast call` loop into a single Multicall3 round trip — important on public RPCs (Base, Arbitrum, etc.) that throttle bursts. A per-stream loop intermittently produces empty stdout when individual calls are rate-limited, which silently propagates into the bc accumulators below and surfaces as cascading `bc: parser error` lines on the v3.0+ branch.
 
 **Why MAX, not SUM.** `withdrawMultiple` does not call `withdraw` externally — it `delegatecall`s into `withdraw` for each stream (see `lockup/src/SablierLockup.sol:437-447`). Solidity preserves `msg.value` across `delegatecall`, and the inner `_withdraw` checks `msg.value >= calculateMinFeeWei(streamId)` (see `lockup/src/SablierLockup.sol:682-687`). So a single `msg.value` covers every iteration; the contract receives the fee exactly once per outer call. Sending the SUM would still pass the contract's check but would needlessly tie up extra ETH in the contract balance — the skill always sends the MAX, so the user pays the minimum required to satisfy every per-stream fee gate. If every stream in the group has a zero fee, `MSG_VALUE` is `0` and the transaction is fee-free.
 
@@ -542,7 +544,7 @@ RESPONSE=$(curl -sS "$INDEXER" \
 
 # 2) Drop zero-withdrawable streams via Multicall3 (one RPC round trip)
 STREAMS=$(echo "$RESPONSE" | jq '.data.LockupStream' \
-  | "$SKILL_DIR/scripts/filter-withdrawable.sh" \
+  | "$SKILL_DIR/scripts/evm/filter-withdrawable.sh" \
       --rpc-url "$RPC_URL" \
       --chain-id "$CHAIN_ID")
 
@@ -573,7 +575,7 @@ for ROW in $(echo "$GROUPS" | jq -c '.[]'); do
       ;;
     *)
       MSG_VALUE=$(echo "$ROW" | jq '.streams' \
-        | "$SKILL_DIR/scripts/max-min-fee.sh" \
+        | "$SKILL_DIR/scripts/evm/max-min-fee.sh" \
             --rpc-url "$RPC_URL" --chain-id "$CHAIN_ID")
       ;;
   esac
